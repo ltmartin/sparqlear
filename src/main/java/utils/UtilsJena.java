@@ -8,6 +8,7 @@ import org.apache.jena.query.QueryExecution;
 import org.apache.jena.query.QueryExecutionFactory;
 import org.apache.jena.query.QuerySolution;
 import org.apache.jena.query.ResultSet;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -20,6 +21,7 @@ import java.util.Set;
  *
  * */
 @Component
+@Lazy
 public class UtilsJena {
     /**
      * Method to derive the triples directly related with a example.
@@ -37,7 +39,7 @@ public class UtilsJena {
         Set<Triple> results = new HashSet<>();
 
         // If the example is an URI it should be between <> or between quotes otherwise.
-        example = UrlValidator.getInstance().isValid(example) ? "<" + example + ">" : "'" + example + "'";
+        example = getSparqlCompatibleExample(example);
 
         String exampleSubject = null, examplePredicate = null, exampleObject = null;
 
@@ -99,6 +101,18 @@ public class UtilsJena {
         }
 
         return results;
+    }
+
+    public static String getCanonicalExample(String example){
+        example = example.replaceAll("<","");
+        example = example.replaceAll(">","");
+        example = example.replaceAll("'","");
+
+        return example;
+    }
+
+    public static String getSparqlCompatibleExample(String example){
+        return UrlValidator.getInstance().isValid(example) ? "<" + example + ">" : "'" + example + "'";
     }
 
 }
