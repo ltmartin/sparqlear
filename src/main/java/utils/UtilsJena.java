@@ -55,7 +55,7 @@ public class UtilsJena {
             exampleSubject = "SELECT ?p ?o WHERE {" + example + " ?p ?o .} LIMIT " + threshold;
 
             // Only URIs are valid predicates according to the SPARQL specification.
-            if (UrlValidator.getInstance().isValid(example))
+            if (UrlValidator.getInstance().isValid(UtilsJena.getCanonicalExample(example)))
                 examplePredicate = "SELECT ?s ?o WHERE { ?s " + example + " ?o .} LIMIT " + threshold;
 
             exampleObject = "SELECT ?s ?p WHERE { ?s ?p " + example + " .} LIMIT " + threshold;
@@ -66,8 +66,8 @@ public class UtilsJena {
             while (rs.hasNext()) {
                 QuerySolution row = rs.next();
                 Node subject = NodeFactory.createLiteral(example);
-                Node predicate = NodeFactory.createLiteral(row.getResource("?p").toString());
-                Node object = NodeFactory.createLiteral(row.getResource("?o").toString());
+                Node predicate = row.get("?p").asNode();
+                Node object = row.get("?o").asNode();
                 Triple triple = new Triple(subject, predicate, object);
                 results.add(triple);
             }
@@ -79,9 +79,9 @@ public class UtilsJena {
                 ResultSet rs = qexec.execSelect();
                 while (rs.hasNext()) {
                     QuerySolution row = rs.next();
-                    Node subject = NodeFactory.createLiteral(row.getResource("?s").toString());
+                    Node subject = row.get("?s").asNode();
                     Node predicate = NodeFactory.createLiteral(example);
-                    Node object = NodeFactory.createLiteral(row.getResource("?o").toString());
+                    Node object = row.get("?o").asNode();
                     Triple triple = new Triple(subject, predicate, object);
                     results.add(triple);
                 }
@@ -92,8 +92,9 @@ public class UtilsJena {
             ResultSet rs = qexec.execSelect();
             while (rs.hasNext()) {
                 QuerySolution row = rs.next();
-                Node subject = NodeFactory.createLiteral(row.getResource("?s").toString());
-                Node predicate = NodeFactory.createLiteral(row.getResource("?p").toString());
+
+                Node subject = row.get("?s").asNode();
+                Node predicate = row.get("?p").asNode();
                 Node object = NodeFactory.createLiteral(example);
                 Triple triple = new Triple(subject, predicate, object);
                 results.add(triple);
@@ -107,6 +108,7 @@ public class UtilsJena {
         example = example.replaceAll("<","");
         example = example.replaceAll(">","");
         example = example.replaceAll("'","");
+        example = example.replaceAll("\"","");
 
         return example;
     }

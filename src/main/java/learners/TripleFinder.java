@@ -33,7 +33,7 @@ public class TripleFinder {
                         p.put(example, (Triple) t);
                         return p;
                     })
-                    .collect(Collectors.toSet());
+                    .collect(Collectors.toCollection(QueueSet::new));
 
             while ((!queue.isEmpty()) && (candidateTriples.size() < threshold)){
                 Hashtable<String, Triple> pair = (Hashtable<String, Triple>) ((QueueSet)queue).poll();
@@ -65,7 +65,7 @@ public class TripleFinder {
                         p.put(item, (Triple) t);
                         return p;
                     })
-                    .collect(Collectors.toSet()));
+                    .collect(Collectors.toCollection(QueueSet::new)));
         }
     }
 }
