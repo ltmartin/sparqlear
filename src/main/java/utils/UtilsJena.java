@@ -4,10 +4,7 @@ import org.apache.commons.validator.routines.UrlValidator;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
-import org.apache.jena.query.QueryExecution;
-import org.apache.jena.query.QueryExecutionFactory;
-import org.apache.jena.query.QuerySolution;
-import org.apache.jena.query.ResultSet;
+import org.apache.jena.query.*;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +12,8 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * @author Leandro Tabares Martín
@@ -23,6 +22,8 @@ import java.util.Set;
 @Component
 @Lazy
 public class UtilsJena {
+    private final Logger logger = Logger.getLogger(UtilsJena.class.getName());
+
     /**
      * Method to derive the triples directly related with a example.
      *
@@ -71,6 +72,10 @@ public class UtilsJena {
                 Triple triple = new Triple(subject, predicate, object);
                 results.add(triple);
             }
+        } catch (QueryParseException e){
+            System.out.println("===============================================");
+            logger.log(Level.SEVERE, "Error processing the query: \n" + exampleSubject + "\n");
+            System.out.println("===============================================");
         }
 
         // Only URIs are valid predicates according to the SPARQL specification.
@@ -85,6 +90,10 @@ public class UtilsJena {
                     Triple triple = new Triple(subject, predicate, object);
                     results.add(triple);
                 }
+            } catch (QueryParseException e){
+                System.out.println("===============================================");
+                logger.log(Level.SEVERE, "Error processing the query: \n" + examplePredicate + "\n");
+                System.out.println("===============================================");
             }
         }
 
@@ -99,6 +108,10 @@ public class UtilsJena {
                 Triple triple = new Triple(subject, predicate, object);
                 results.add(triple);
             }
+        } catch (QueryParseException e){
+            System.out.println("===============================================");
+            logger.log(Level.SEVERE, "Error processing the query: \n" + exampleObject + "\n");
+            System.out.println("===============================================");
         }
 
         return results;
