@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ForkJoinPool;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -37,8 +38,6 @@ public class UtilsJena {
         if (!UrlValidator.getInstance().isValid(endpoint))
             throw new IOException("Invalid endpoint");
 
-        Set<Triple> results = new HashSet<>();
-
         // If the example is an URI it should be between <> or between quotes otherwise.
         example = getSparqlCompatibleExample(example);
 
@@ -62,59 +61,9 @@ public class UtilsJena {
             exampleObject = "SELECT ?s ?p WHERE { ?s ?p " + example + " .} LIMIT " + threshold;
         }
 
-        try (QueryExecution qexec = QueryExecutionFactory.sparqlService(endpoint, exampleSubject)) {
-            ResultSet rs = qexec.execSelect();
-            while (rs.hasNext()) {
-                QuerySolution row = rs.next();
-                Node subject = NodeFactory.createLiteral(example);
-                Node predicate = row.get("?p").asNode();
-                Node object = row.get("?o").asNode();
-                Triple triple = new Triple(subject, predicate, object);
-                results.add(triple);
-            }
-        } catch (QueryParseException e){
-            System.out.println("===============================================");
-            logger.log(Level.SEVERE, "Error processing the query: \n" + exampleSubject + "\n");
-            System.out.println("===============================================");
-        }
+        QueryExecutor executorTask = new QueryExecutor(endpoint, exampleSubject, examplePredicate, exampleObject, example, QueryExecutor.NONE_SELECTOR);
 
-        // Only URIs are valid predicates according to the SPARQL specification.
-        if (UrlValidator.getInstance().isValid(example)) {
-            try (QueryExecution qexec = QueryExecutionFactory.sparqlService(endpoint, examplePredicate)) {
-                ResultSet rs = qexec.execSelect();
-                while (rs.hasNext()) {
-                    QuerySolution row = rs.next();
-                    Node subject = row.get("?s").asNode();
-                    Node predicate = NodeFactory.createLiteral(example);
-                    Node object = row.get("?o").asNode();
-                    Triple triple = new Triple(subject, predicate, object);
-                    results.add(triple);
-                }
-            } catch (QueryParseException e){
-                System.out.println("===============================================");
-                logger.log(Level.SEVERE, "Error processing the query: \n" + examplePredicate + "\n");
-                System.out.println("===============================================");
-            }
-        }
-
-        try (QueryExecution qexec = QueryExecutionFactory.sparqlService(endpoint, exampleObject)) {
-            ResultSet rs = qexec.execSelect();
-            while (rs.hasNext()) {
-                QuerySolution row = rs.next();
-
-                Node subject = row.get("?s").asNode();
-                Node predicate = row.get("?p").asNode();
-                Node object = NodeFactory.createLiteral(example);
-                Triple triple = new Triple(subject, predicate, object);
-                results.add(triple);
-            }
-        } catch (QueryParseException e){
-            System.out.println("===============================================");
-            logger.log(Level.SEVERE, "Error processing the query: \n" + exampleObject + "\n");
-            System.out.println("===============================================");
-        }
-
-        return results;
+        return new ForkJoinPool().invoke(executorTask);
     }
 
     public static String getCanonicalExample(String example){
