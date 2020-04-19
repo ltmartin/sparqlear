@@ -1,20 +1,13 @@
 package utils;
 
 import org.apache.commons.validator.routines.UrlValidator;
-import org.apache.jena.graph.Node;
-import org.apache.jena.graph.NodeFactory;
-import org.apache.jena.graph.Triple;
-import org.apache.jena.query.*;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * @author Leandro Tabares Martín
@@ -23,7 +16,6 @@ import java.util.logging.Logger;
 @Component
 @Lazy
 public class UtilsJena {
-    private final Logger logger = Logger.getLogger(UtilsJena.class.getName());
 
     /**
      * Method to derive the triples directly related with a example.
