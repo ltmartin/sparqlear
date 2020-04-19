@@ -7,7 +7,8 @@ import utils.UtilsJena;
 import java.io.*;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.util.LinkedList;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -17,7 +18,7 @@ public class DbpediaLogFileProcessor {
     private final Logger logger = Logger.getLogger(UtilsJena.class.getName());
 
     public void processLogFile(File file){
-        LinkedList<String> queries = new LinkedList<>();
+        Set<String> queries = new HashSet<>();
         String line = null;
         try (BufferedReader br = new BufferedReader(new FileReader(file.toString()))){
             while ((line = br.readLine()) != null) {

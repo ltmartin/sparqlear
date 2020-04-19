@@ -20,6 +20,7 @@ class DbpediaLogFileProcessorTest {
     void processLogFile() {
         try (Stream<Path> paths = Files.walk(Paths.get("queryLogs"))){
             paths
+                    .parallel()
                     .filter(Files::isRegularFile)
                     .forEach((e) -> {
                         dbpediaLogFileProcessor.processLogFile(e.toFile());
