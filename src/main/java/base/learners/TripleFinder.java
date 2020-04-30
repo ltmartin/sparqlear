@@ -1,11 +1,11 @@
-package learners;
+package base.learners;
 
-import domain.QueueSet;
+import base.domain.QueueSet;
 import org.apache.jena.graph.Triple;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
-import utils.UtilsJena;
+import base.utils.UtilsJena;
 
 import java.io.IOException;
 import java.util.*;

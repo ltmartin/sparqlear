@@ -1,4 +1,4 @@
-package utils;
+package base.utils;
 
 import org.apache.commons.validator.routines.UrlValidator;
 import org.apache.jena.graph.Node;

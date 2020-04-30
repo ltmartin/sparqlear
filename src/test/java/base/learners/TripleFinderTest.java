@@ -1,10 +1,10 @@
-package learners;
+package base.learners;
 
-import config.Application;
-import config.Parameters;
+import base.Application;
 import org.apache.jena.graph.Triple;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.io.FileWriter;
@@ -15,6 +15,12 @@ import java.util.Set;
 
 @SpringBootTest(classes = Application.class)
 class TripleFinderTest {
+    @Value("${sparqlear.sparql.endpoint}")
+    private String endpoint;
+    @Value("${sparqlear.test.example}")
+    private String example;
+    @Value("${sparqlear.sparql.candidateTriples.limit}")
+    private int limit;
     @Autowired
     private TripleFinder tripleFinder;
 
@@ -22,7 +28,7 @@ class TripleFinderTest {
     public void deriveCandidateTriplesTest(){
         try {
             long initTime = System.nanoTime();
-            Set<Hashtable<String, Triple>> candidateTriples =  tripleFinder.deriveCandidateTriples(Parameters.example, Parameters.endpoint, Optional.empty(), Parameters.threshold);
+            Set<Hashtable<String, Triple>> candidateTriples =  tripleFinder.deriveCandidateTriples(example, endpoint, Optional.empty(), limit);
             long endTime = System.nanoTime();
 
             long elapsedTimeMinutes = ((endTime - initTime)/1000000)/60000;
