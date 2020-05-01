@@ -15,6 +15,8 @@ import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.Optional;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 /**
@@ -25,6 +27,7 @@ import java.util.stream.Collectors;
 @Component
 @Lazy
 public class TripleFinder {
+    private final Logger logger = Logger.getLogger(TripleFinder.class.getName());
     @Value("${sparqlear.verifyPredicatesRank}")
     private Boolean verifyPredicatesRank;
     @Value("${sparqlear.propertyWeight.threshold}")
@@ -34,7 +37,11 @@ public class TripleFinder {
     @Resource
     private PropertyRepository propertyRepository;
 
+    private Hashtable<Integer, Property> rankedProperties;
+
     public Set<Hashtable<String, Triple>> deriveCandidateTriples(String example, String endpoint, Optional<String> dataset, int threshold) throws IOException {
+        loadProperties();
+        logger.log(Level.INFO, "Starting to derive candidate triples...");
         Set<Hashtable<String, Triple>> candidateTriples = new HashSet<>();
 
         Set<Hashtable<String, Triple>> queue;
@@ -65,19 +72,28 @@ public class TripleFinder {
         } catch (IOException e) {
             throw new IOException("Please check the endpoint and dataset parameters.");
         }
-
+        logger.log(Level.INFO, "Candidate triples successfully derived.");
         return candidateTriples;
     }
 
-    private void checkPredicatesRank(String example, String endpoint, Optional<String> dataset, int threshold, Set<Hashtable<String, Triple>> candidateTriples, Set<Hashtable<String, Triple>> queue, String object) throws IOException {
+    private void loadProperties() {
+        logger.log(Level.INFO, "Loading ranked properties...");
+        rankedProperties = new Hashtable<>();
+        propertyRepository.findAll().forEach(property -> {
+            rankedProperties.put(property.hashCode(), property);
+        });
+        logger.log(Level.INFO, "Ranked properties successfully loaded.");
+    }
+
+    private void checkPredicatesRank(String example, String endpoint, Optional<String> dataset, int threshold, Set<Hashtable<String, Triple>> candidateTriples, Set<Hashtable<String, Triple>> queue, String label) throws IOException {
         if (verifyPredicatesRank){
-            Property property = propertyRepository.findPropertyByLabel(object);
+            Property property = rankedProperties.get(label.hashCode());
             if ((null != property) && (property.getWeight() >= weightThreshold))
-                deriveDirectTriples(example, endpoint, dataset, threshold, candidateTriples, queue, object);
+                deriveDirectTriples(example, endpoint, dataset, threshold, candidateTriples, queue, label);
             else if (null == property)
-                deriveDirectTriples(example, endpoint, dataset, threshold, candidateTriples, queue, object);
+                deriveDirectTriples(example, endpoint, dataset, threshold, candidateTriples, queue, label);
         } else
-            deriveDirectTriples(example, endpoint, dataset, threshold, candidateTriples, queue, object);
+            deriveDirectTriples(example, endpoint, dataset, threshold, candidateTriples, queue, label);
     }
 
     private void deriveDirectTriples(String example, String endpoint, Optional<String> dataset, int threshold, Set<Hashtable<String, Triple>> candidateTriples, Set<Hashtable<String, Triple>> queue, String item) throws IOException {
