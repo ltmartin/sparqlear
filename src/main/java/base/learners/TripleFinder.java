@@ -2,7 +2,7 @@ package base.learners;
 
 import base.domain.Property;
 import base.domain.QueueSet;
-import base.repository.PropertyRepository;
+import base.services.PropertiesService;
 import base.utils.UtilsJena;
 import org.apache.jena.graph.Triple;
 import org.springframework.beans.factory.annotation.Value;
@@ -11,10 +11,7 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.io.IOException;
-import java.util.HashSet;
-import java.util.Hashtable;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -35,15 +32,16 @@ public class TripleFinder {
     @Resource
     private UtilsJena utilsJena;
     @Resource
-    private PropertyRepository propertyRepository;
+    private PropertiesService propertiesService;
 
     private Hashtable<Integer, Property> rankedProperties;
 
     public Set<Hashtable<String, Triple>> deriveCandidateTriples(String example, String endpoint, Optional<String> dataset, int threshold) throws IOException {
-        loadProperties();
+        if (verifyPredicatesRank)
+            rankedProperties = propertiesService.loadProperties();
+
         logger.log(Level.INFO, "Starting to derive candidate triples...");
         Set<Hashtable<String, Triple>> candidateTriples = new HashSet<>();
-
         Set<Hashtable<String, Triple>> queue;
         try {
             queue = (Set<Hashtable<String, Triple>>) utilsJena.deriveTriples(example, endpoint, dataset, threshold).stream()
@@ -76,27 +74,19 @@ public class TripleFinder {
         return candidateTriples;
     }
 
-    private void loadProperties() {
-        logger.log(Level.INFO, "Loading ranked properties...");
-        rankedProperties = new Hashtable<>();
-        propertyRepository.findAll().forEach(property -> {
-            rankedProperties.put(property.hashCode(), property);
-        });
-        logger.log(Level.INFO, "Ranked properties successfully loaded.");
-    }
 
     private void checkPredicatesRank(String example, String endpoint, Optional<String> dataset, int threshold, Set<Hashtable<String, Triple>> candidateTriples, Set<Hashtable<String, Triple>> queue, String label) throws IOException {
         if (verifyPredicatesRank){
             Property property = rankedProperties.get(label.hashCode());
             if ((null != property) && (property.getWeight() >= weightThreshold))
-                deriveDirectTriples(example, endpoint, dataset, threshold, candidateTriples, queue, label);
+                derive(example, endpoint, dataset, threshold, candidateTriples, queue, label);
             else if (null == property)
-                deriveDirectTriples(example, endpoint, dataset, threshold, candidateTriples, queue, label);
+                derive(example, endpoint, dataset, threshold, candidateTriples, queue, label);
         } else
-            deriveDirectTriples(example, endpoint, dataset, threshold, candidateTriples, queue, label);
+            derive(example, endpoint, dataset, threshold, candidateTriples, queue, label);
     }
 
-    private void deriveDirectTriples(String example, String endpoint, Optional<String> dataset, int threshold, Set<Hashtable<String, Triple>> candidateTriples, Set<Hashtable<String, Triple>> queue, String item) throws IOException {
+    private void derive(String example, String endpoint, Optional<String> dataset, int threshold, Set<Hashtable<String, Triple>> candidateTriples, Set<Hashtable<String, Triple>> queue, String item) throws IOException {
         if (!example.equals(item)){
             queue.addAll((Set<Hashtable<String, Triple>>) utilsJena.deriveTriples(item, endpoint, dataset, threshold - candidateTriples.size()).stream()
                     .map(t -> {
