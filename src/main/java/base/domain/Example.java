@@ -7,11 +7,13 @@ public class Example {
     private Integer group;
     private String example;
     private Boolean category;
+    private Integer position;
 
-    public Example(Integer group, String example, Boolean category) {
+    public Example(Integer group, String example, Boolean category, Integer position) {
         this.group = group;
         this.example = example;
         this.category = category;
+        this.position = position;
     }
 
     public Example(String example, Boolean category) {
@@ -29,6 +31,10 @@ public class Example {
 
     public Boolean getCategory() {
         return category;
+    }
+
+    public Integer getPosition() {
+        return position;
     }
 
     @Override

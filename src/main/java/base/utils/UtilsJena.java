@@ -71,4 +71,6 @@ public class UtilsJena {
         return UrlValidator.getInstance().isValid(example) ? "<" + example + ">" : "'" + example + "'";
     }
 
+
+
 }

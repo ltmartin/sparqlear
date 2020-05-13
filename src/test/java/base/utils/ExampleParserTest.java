@@ -51,7 +51,7 @@ class ExampleParserTest {
     }
 
     boolean test3(String example){
-        Set<Example> expectedOutput = Set.of(new Example(0,"Rubens", Example.CATEGORY_POSITIVE), new Example(0,"Belgium", Example.CATEGORY_POSITIVE));
+        Set<Example> expectedOutput = Set.of(new Example(0,"Rubens", Example.CATEGORY_POSITIVE, 0), new Example(0,"Belgium", Example.CATEGORY_POSITIVE, 1));
         try {
             Set<Example> output = exampleParser.parse(example);
             Assertions.assertTrue(expectedOutput.size() == output.size() && expectedOutput.containsAll(output) && output.containsAll(expectedOutput));
@@ -63,12 +63,12 @@ class ExampleParserTest {
 
     boolean test4(String example){
         Set<Example> expectedOutput = Set.of(
-                new Example(0,"Rubens", Example.CATEGORY_POSITIVE),
-                new Example(0,"Belgium", Example.CATEGORY_POSITIVE),
-                new Example(0,"Painter", Example.CATEGORY_POSITIVE),
-                new Example(1,"Jose", Example.CATEGORY_POSITIVE),
-                new Example(1,"Cuba", Example.CATEGORY_POSITIVE),
-                new Example(1,"Writer", Example.CATEGORY_POSITIVE)
+                new Example(0,"Rubens", Example.CATEGORY_POSITIVE, 0),
+                new Example(0,"Belgium", Example.CATEGORY_POSITIVE, 1),
+                new Example(0,"Painter", Example.CATEGORY_POSITIVE, 2),
+                new Example(1,"Jose", Example.CATEGORY_POSITIVE, 0),
+                new Example(1,"Cuba", Example.CATEGORY_POSITIVE, 1),
+                new Example(1,"Writer", Example.CATEGORY_POSITIVE, 2)
         );
         try {
             Set<Example> output = exampleParser.parse(example);

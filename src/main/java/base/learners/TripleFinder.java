@@ -30,6 +30,10 @@ public class TripleFinder {
     private Boolean verifyPredicatesRank;
     @Value("${sparqlear.propertyWeight.threshold}")
     private float weightThreshold;
+    @Value("${sparqlear.sparql.candidateTriples.limit}")
+    private int limit;
+    @Value("${sparqlear.sparql.endpoint}")
+    private String endpoint;
     @Resource
     private UtilsJena utilsJena;
     @Resource
@@ -37,7 +41,7 @@ public class TripleFinder {
 
     private Hashtable<Integer, Property> rankedProperties;
 
-    public Set<ExampleEntry<String, Triple>> deriveCandidateTriples(String example, String endpoint, Optional<String> dataset, int limit) throws IOException {
+    public Set<ExampleEntry<String, Triple>> deriveCandidateTriples(String example, Optional<String> dataset) throws IOException {
         if (verifyPredicatesRank)
             rankedProperties = propertiesService.loadProperties();
 

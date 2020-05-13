@@ -15,12 +15,8 @@ import java.util.Set;
 
 @SpringBootTest(classes = Application.class)
 class TripleFinderTest {
-    @Value("${sparqlear.sparql.endpoint}")
-    private String endpoint;
     @Value("${sparqlear.test.example}")
     private String example;
-    @Value("${sparqlear.sparql.candidateTriples.limit}")
-    private int limit;
     @Autowired
     private TripleFinder tripleFinder;
 
@@ -28,7 +24,7 @@ class TripleFinderTest {
     public void deriveCandidateTriplesTest(){
         try {
             long initTime = System.nanoTime();
-            Set<ExampleEntry<String, Triple>> candidateTriples =  tripleFinder.deriveCandidateTriples(example, endpoint, Optional.empty(), limit);
+            Set<ExampleEntry<String, Triple>> candidateTriples =  tripleFinder.deriveCandidateTriples(example, Optional.empty());
             long endTime = System.nanoTime();
 
             long elapsedTimeMinutes = ((endTime - initTime)/1000000)/60000;

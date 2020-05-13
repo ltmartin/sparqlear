@@ -2,10 +2,13 @@ package base.learners;
 
 import base.domain.Example;
 import base.domain.ExampleEntry;
-import base.domain.Property;
+import base.domain.Hyperedge;
+import base.exceptions.ExampleException;
 import base.services.PropertiesService;
 import base.utils.DatasetsParser;
 import base.utils.ExampleParser;
+import org.apache.jena.graph.Node;
+import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
@@ -39,14 +42,21 @@ public class QueryLearner {
     private String datasets;
     @Value("${sparqlear.verifyPredicatesRank}")
     private Boolean useRanking;
+    // Used to select from which example start the learning process.
+    private int initialGroup = -1;
 
-    public Set<String> learn(String examples) throws ParseException {
+    public Set<String> learn(String examples) throws ParseException, ExampleException, IOException {
         Set<String> derivedQueries = new HashSet<>();
         Set<String> parsedDatasets = null;
+        initialGroup++;
 
         logger.log(Level.INFO, "Parsing examples...");
         Set<Example> parsedExamples = exampleParser.parse(examples);
         logger.log(Level.INFO, "Examples parsed.");
+
+        int examplesGroupsQuantity = parsedExamples.stream().collect(Collectors.groupingBy(Example::getGroup)).size();
+        if (initialGroup >= examplesGroupsQuantity)
+            throw new ExampleException("Not enough examples to learn.");
 
         if (!datasets.isEmpty()) {
             logger.log(Level.INFO, "Parsing datasets...");
@@ -54,60 +64,100 @@ public class QueryLearner {
             logger.log(Level.INFO, "Datasets parsed.");
         }
 
-        boolean singleVariableQuery = parsedExamples.iterator().next().getGroup() == null;
+        if (null == parsedDatasets) {
+            boolean multipleVariableExamples = null != parsedExamples.iterator().next().getGroup();
 
-        if (singleVariableQuery) {
-            for (Example example : parsedExamples) {
-                if (null == parsedDatasets) {
-                    try {
-                        logger.log(Level.INFO, "Single variable and single dataset query derivation started.");
-                        Set<ExampleEntry<String, Triple>> derivedTriples = tripleFinder.deriveCandidateTriples(example.getExample(), endpoint, Optional.empty(), limit);
-                        logger.log(Level.INFO, "Single variable and single dataset query derivation finished.");
-                        Map<Object, List<ExampleEntry<String, Triple>>> sortedTriples = sort(derivedTriples);
-                    } catch (IOException e) {
-                        logger.log(Level.SEVERE, "Single variable and single dataset query derivation failed.");
-                        logger.log(Level.SEVERE, e.getMessage());
-                    }
-
-                } else {
-
-                }
+            Set<Example> positiveExampleGroup = new HashSet<>();
+            if (!multipleVariableExamples)
+                positiveExampleGroup = Set.of(parsedExamples.iterator().next());
+            else {
+                positiveExampleGroup.addAll(parsedExamples.stream()
+                        .filter(example -> example.getCategory().equals(Example.CATEGORY_POSITIVE))
+                        .takeWhile(example -> example.getGroup().equals(initialGroup))
+                        .collect(Collectors.toSet()));
             }
-        } else {
 
+            Set<Hyperedge> hyperedges = constructHyperedges(positiveExampleGroup, parsedExamples);
+
+        } else {
+            // TODO: Create the flow for learning from multiple datasets.
         }
+
 
         return derivedQueries;
     }
 
-    public Map<Object, List<ExampleEntry<String, Triple>>> sort(Set<ExampleEntry<String, Triple>> derivedTriples) {
-        Map<Object, List<ExampleEntry<String, Triple>>> sortedTriples = new HashMap<>();
+    private Set<Hyperedge> constructHyperedges(Set<Example> positiveExampleGroup, Set<Example> parsedExamples) throws IOException {
+        Set<Hyperedge> hyperedges = new HashSet<>();
 
-        Map<Object, List<ExampleEntry<String, Triple>>> groupedTriples = derivedTriples.stream()
-                .collect(Collectors.groupingBy(entry -> entry.getKey()));
+        for (Example c : positiveExampleGroup) {
 
-        Set<Object> keySet = groupedTriples.keySet();
-        if (useRanking) {
-            Hashtable<Integer, Property> rankedProperties = propertiesService.loadProperties();
-            for (Object key : keySet) {
-                List<ExampleEntry<String, Triple>> triplesByExample = groupedTriples.get(key);
-                triplesByExample.sort((e1, e2) -> {
-                    String predicate1 = e1.getValue().getPredicate().toString();
-                    String predicate2 = e2.getValue().getPredicate().toString();
-                    if ((null != rankedProperties.get(predicate1.hashCode())) && (null != rankedProperties.get(predicate2.hashCode())))
-                        return (rankedProperties.get(predicate1.hashCode()).getWeight() > rankedProperties.get(predicate2.hashCode()).getWeight())? -1 : (rankedProperties.get(predicate1.hashCode()).getWeight() == rankedProperties.get(predicate2.hashCode()).getWeight())? 0 : 1;
-                    else if ((null != rankedProperties.get(predicate1.hashCode())))
-                        return (rankedProperties.get(predicate1.hashCode()).getWeight() > 0)? -1 : 1;
-                    else if ((null != rankedProperties.get(predicate2.hashCode())))
-                        return (rankedProperties.get(predicate2.hashCode()).getWeight() > 0)? 1 : -1;
-                    else
-                        return 0;
-                });
-                sortedTriples.put(key, triplesByExample);
-            }
-            return sortedTriples;
+            Set<ExampleEntry<String, Triple>> componentCandidateTriples = tripleFinder.deriveCandidateTriples(c.getExample(), Optional.empty());
+
+            int selectedVariablesAmount = introduceVariables(componentCandidateTriples, parsedExamples);
+            StringBuilder stringBuilder = new StringBuilder();
+
+            stringBuilder.append("SELECT ");
+            for (int i = 0; i < selectedVariablesAmount; i++)
+                stringBuilder.append("?sv" + i + ", ");
+            stringBuilder.deleteCharAt(stringBuilder.lastIndexOf(","));
+            stringBuilder.append("WHERE { ");
+            for (ExampleEntry<String, Triple> cct: componentCandidateTriples)
+                stringBuilder.append(cct.getValue().toString() + ".");
+            stringBuilder.append("}");
+
+            String query = stringBuilder.toString();
         }
 
-        return groupedTriples;
+        return hyperedges;
     }
+
+    private int introduceVariables(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Set<Example> parsedExamples) {
+        int svIndex = 0, nsvIndex = 0;
+        Map<String, Node> variableNames = new HashMap<>();
+        for (ExampleEntry<String, Triple> cct: componentCandidateTriples) {
+            boolean isExampleProvidedByUser = parsedExamples.stream().filter(example -> example.getExample().equals(cct.getKey())).count() != 0;
+
+            if (cct.getValue().getSubject().toString().equals(cct.getKey())){
+                Node newSubject;
+                if (!variableNames.containsKey(cct.getKey())) {
+                    if (isExampleProvidedByUser)
+                        newSubject = NodeFactory.createVariable("sv" + svIndex++);
+                    else
+                        newSubject = NodeFactory.createVariable("x" + nsvIndex++);
+
+                    variableNames.put(cct.getKey(), newSubject);
+                    cct.setValue(new Triple(newSubject, cct.getValue().getPredicate(), cct.getValue().getObject()));
+                } else
+                    cct.setValue(new Triple(variableNames.get(cct.getKey()), cct.getValue().getPredicate(), cct.getValue().getObject()));
+            } else if (cct.getValue().getPredicate().toString().equals(cct.getKey())){
+                Node newPredicate;
+                if (!variableNames.containsKey(cct.getKey())) {
+                    if (isExampleProvidedByUser)
+                        newPredicate = NodeFactory.createVariable("sv" + svIndex++);
+                    else
+                        newPredicate = NodeFactory.createVariable("x" + nsvIndex++);
+
+                    variableNames.put(cct.getKey(), newPredicate);
+                    cct.setValue(new Triple(cct.getValue().getSubject(), newPredicate, cct.getValue().getObject()));
+                } else
+                    cct.setValue(new Triple(cct.getValue().getSubject(), variableNames.get(cct.getKey()), cct.getValue().getObject()));
+            } else if (cct.getValue().getObject().toString().equals(cct.getKey())){
+                Node newObject;
+                if (!variableNames.containsKey(cct.getKey())) {
+                    if (isExampleProvidedByUser)
+                        newObject = NodeFactory.createVariable("sv" + svIndex++);
+                    else
+                        newObject = NodeFactory.createVariable("x" + nsvIndex++);
+
+                    variableNames.put(cct.getKey(), newObject);
+                    cct.setValue(new Triple(cct.getValue().getSubject(), cct.getValue().getPredicate(), newObject));
+                } else
+                    cct.setValue(new Triple(cct.getValue().getSubject(), cct.getValue().getPredicate(), variableNames.get(cct.getKey())));
+            }
+        }
+
+        return svIndex;
+    }
+
 }

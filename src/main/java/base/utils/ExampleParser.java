@@ -35,11 +35,12 @@ public class ExampleParser {
                     String aux = e.substring(2, e.length() - 1);
 
                     Set<String> variables = Set.of(aux.split(",\\s{1}"));
+                    int position = 0;
                     for (String v : variables)
                         if (positive)
-                            parsedExamples.add(new Example(groupId, v, Example.CATEGORY_POSITIVE));
+                            parsedExamples.add(new Example(groupId, v, Example.CATEGORY_POSITIVE, position++));
                         else
-                            parsedExamples.add(new Example(groupId, v, Example.CATEGORY_NEGATIVE));
+                            parsedExamples.add(new Example(groupId, v, Example.CATEGORY_NEGATIVE, position++));
                     groupId++;
                 }
             }
