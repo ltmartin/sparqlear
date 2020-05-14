@@ -32,8 +32,6 @@ public class TripleFinder {
     private float weightThreshold;
     @Value("${sparqlear.sparql.candidateTriples.limit}")
     private int limit;
-    @Value("${sparqlear.sparql.endpoint}")
-    private String endpoint;
     @Resource
     private UtilsJena utilsJena;
     @Resource
@@ -49,7 +47,7 @@ public class TripleFinder {
         Set<ExampleEntry<String, Triple>> candidateTriples = new QueueSet<>();
         Set<ExampleEntry<String, Triple>> queue;
         try {
-            queue = (Set<ExampleEntry<String, Triple>>) utilsJena.deriveTriples(example, endpoint, dataset, limit).stream()
+            queue = (Set<ExampleEntry<String, Triple>>) utilsJena.deriveTriples(example, dataset, limit).stream()
                     .map(t -> {
                         return new ExampleEntry<String, Triple>(example, (Triple) t);
                     })
@@ -61,13 +59,13 @@ public class TripleFinder {
 
                 Triple triple = pair.getValue();
                 String subject = UtilsJena.getCanonicalExample(triple.getSubject().toString());
-                checkPredicatesRank(example, endpoint, dataset, limit, candidateTriples, queue, subject);
+                checkPredicatesRank(example, dataset, limit, candidateTriples, queue, subject);
 
                 String predicate = UtilsJena.getCanonicalExample(triple.getPredicate().toString());
-                checkPredicatesRank(example, endpoint, dataset, limit, candidateTriples, queue, predicate);
+                checkPredicatesRank(example, dataset, limit, candidateTriples, queue, predicate);
 
                 String object = UtilsJena.getCanonicalExample(triple.getObject().toString());
-                checkPredicatesRank(example, endpoint, dataset, limit, candidateTriples, queue, object);
+                checkPredicatesRank(example, dataset, limit, candidateTriples, queue, object);
             }
 
         } catch (IOException e) {
@@ -78,20 +76,20 @@ public class TripleFinder {
     }
 
 
-    private void checkPredicatesRank(String example, String endpoint, Optional<String> dataset, int limit, Set<ExampleEntry<String, Triple>> candidateTriples, Set<ExampleEntry<String, Triple>> queue, String label) throws IOException {
+    private void checkPredicatesRank(String example, Optional<String> dataset, int limit, Set<ExampleEntry<String, Triple>> candidateTriples, Set<ExampleEntry<String, Triple>> queue, String label) throws IOException {
         if (verifyPredicatesRank){
             Property property = rankedProperties.get(label.hashCode());
             if ((null != property) && (property.getWeight() >= weightThreshold))
-                derive(example, endpoint, dataset, limit, candidateTriples, queue, label);
+                derive(example, dataset, limit, candidateTriples, queue, label);
             else if (null == property)
-                derive(example, endpoint, dataset, limit, candidateTriples, queue, label);
+                derive(example, dataset, limit, candidateTriples, queue, label);
         } else
-            derive(example, endpoint, dataset, limit, candidateTriples, queue, label);
+            derive(example, dataset, limit, candidateTriples, queue, label);
     }
 
-    private void derive(String example, String endpoint, Optional<String> dataset, int limit, Set<ExampleEntry<String, Triple>> candidateTriples, Set<ExampleEntry<String, Triple>> queue, String item) throws IOException {
+    private void derive(String example, Optional<String> dataset, int limit, Set<ExampleEntry<String, Triple>> candidateTriples, Set<ExampleEntry<String, Triple>> queue, String item) throws IOException {
         if (!example.equals(item)){
-            queue.addAll((Set<ExampleEntry<String, Triple>>) utilsJena.deriveTriples(item, endpoint, dataset, limit - candidateTriples.size()).stream()
+            queue.addAll((Set<ExampleEntry<String, Triple>>) utilsJena.deriveTriples(item, dataset, limit - candidateTriples.size()).stream()
                     .map(t -> {
                         return new ExampleEntry<String, Triple>(item, (Triple) t);
                     })

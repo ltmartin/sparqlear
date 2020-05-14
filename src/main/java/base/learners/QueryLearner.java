@@ -6,9 +6,8 @@ import base.domain.Hyperedge;
 import base.exceptions.ExampleException;
 import base.services.PropertiesService;
 import base.utils.DatasetsParser;
-import base.utils.ExampleParser;
-import org.apache.jena.graph.Node;
-import org.apache.jena.graph.NodeFactory;
+import base.utils.ExampleUtils;
+import base.utils.UtilsJena;
 import org.apache.jena.graph.Triple;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
@@ -29,11 +28,13 @@ public class QueryLearner {
     @Resource
     private TripleFinder tripleFinder;
     @Resource
-    private ExampleParser exampleParser;
+    private ExampleUtils exampleUtils;
     @Resource
     private DatasetsParser datasetsParser;
     @Resource
     private PropertiesService propertiesService;
+    @Resource
+    private UtilsJena utilsJena;
     @Value("${sparqlear.sparql.endpoint}")
     private String endpoint;
     @Value("${sparqlear.sparql.candidateTriples.limit}")
@@ -51,7 +52,7 @@ public class QueryLearner {
         initialGroup++;
 
         logger.log(Level.INFO, "Parsing examples...");
-        Set<Example> parsedExamples = exampleParser.parse(examples);
+        Set<Example> parsedExamples = exampleUtils.parseExamples(examples);
         logger.log(Level.INFO, "Examples parsed.");
 
         int examplesGroupsQuantity = parsedExamples.stream().collect(Collectors.groupingBy(Example::getGroup)).size();
@@ -89,75 +90,45 @@ public class QueryLearner {
 
     private Set<Hyperedge> constructHyperedges(Set<Example> positiveExampleGroup, Set<Example> parsedExamples) throws IOException {
         Set<Hyperedge> hyperedges = new HashSet<>();
+        Map<Boolean, List<Example>> categorizedExamples = parsedExamples.stream().collect(Collectors.groupingBy(Example::getCategory));
 
         for (Example c : positiveExampleGroup) {
 
             Set<ExampleEntry<String, Triple>> componentCandidateTriples = tripleFinder.deriveCandidateTriples(c.getExample(), Optional.empty());
+            Set<List<String>> completeQueryValuation = utilsJena.runCompleteQueryForHyperedges(componentCandidateTriples, parsedExamples);
 
-            int selectedVariablesAmount = introduceVariables(componentCandidateTriples, parsedExamples);
-            StringBuilder stringBuilder = new StringBuilder();
-
-            stringBuilder.append("SELECT ");
-            for (int i = 0; i < selectedVariablesAmount; i++)
-                stringBuilder.append("?sv" + i + ", ");
-            stringBuilder.deleteCharAt(stringBuilder.lastIndexOf(","));
-            stringBuilder.append("WHERE { ");
-            for (ExampleEntry<String, Triple> cct: componentCandidateTriples)
-                stringBuilder.append(cct.getValue().toString() + ".");
-            stringBuilder.append("}");
-
-            String query = stringBuilder.toString();
+            double totalInformationGain = computeInformationGain(completeQueryValuation, categorizedExamples);
         }
 
         return hyperedges;
     }
 
-    private int introduceVariables(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Set<Example> parsedExamples) {
-        int svIndex = 0, nsvIndex = 0;
-        Map<String, Node> variableNames = new HashMap<>();
-        for (ExampleEntry<String, Triple> cct: componentCandidateTriples) {
-            boolean isExampleProvidedByUser = parsedExamples.stream().filter(example -> example.getExample().equals(cct.getKey())).count() != 0;
+    private double computeInformationGain(Set<List<String>> completeQueryValuation, Map<Boolean, List<Example>> examples) {
+        Map<Integer, List<Example>> positiveExamplesByGroup = examples.get(Example.CATEGORY_POSITIVE).stream().collect(Collectors.groupingBy(Example::getGroup));
+        Map<Integer, List<Example>> negativeExamplesByGroup = examples.get(Example.CATEGORY_NEGATIVE).stream().collect(Collectors.groupingBy(Example::getGroup));
 
-            if (cct.getValue().getSubject().toString().equals(cct.getKey())){
-                Node newSubject;
-                if (!variableNames.containsKey(cct.getKey())) {
-                    if (isExampleProvidedByUser)
-                        newSubject = NodeFactory.createVariable("sv" + svIndex++);
-                    else
-                        newSubject = NodeFactory.createVariable("x" + nsvIndex++);
-
-                    variableNames.put(cct.getKey(), newSubject);
-                    cct.setValue(new Triple(newSubject, cct.getValue().getPredicate(), cct.getValue().getObject()));
-                } else
-                    cct.setValue(new Triple(variableNames.get(cct.getKey()), cct.getValue().getPredicate(), cct.getValue().getObject()));
-            } else if (cct.getValue().getPredicate().toString().equals(cct.getKey())){
-                Node newPredicate;
-                if (!variableNames.containsKey(cct.getKey())) {
-                    if (isExampleProvidedByUser)
-                        newPredicate = NodeFactory.createVariable("sv" + svIndex++);
-                    else
-                        newPredicate = NodeFactory.createVariable("x" + nsvIndex++);
-
-                    variableNames.put(cct.getKey(), newPredicate);
-                    cct.setValue(new Triple(cct.getValue().getSubject(), newPredicate, cct.getValue().getObject()));
-                } else
-                    cct.setValue(new Triple(cct.getValue().getSubject(), variableNames.get(cct.getKey()), cct.getValue().getObject()));
-            } else if (cct.getValue().getObject().toString().equals(cct.getKey())){
-                Node newObject;
-                if (!variableNames.containsKey(cct.getKey())) {
-                    if (isExampleProvidedByUser)
-                        newObject = NodeFactory.createVariable("sv" + svIndex++);
-                    else
-                        newObject = NodeFactory.createVariable("x" + nsvIndex++);
-
-                    variableNames.put(cct.getKey(), newObject);
-                    cct.setValue(new Triple(cct.getValue().getSubject(), cct.getValue().getPredicate(), newObject));
-                } else
-                    cct.setValue(new Triple(cct.getValue().getSubject(), cct.getValue().getPredicate(), variableNames.get(cct.getKey())));
+        int positiveExamplesFoundCounter = 0;
+        int negativeExamplesFoundCounter = 0;
+        for (List<String> row: completeQueryValuation) {
+            boolean found = false;
+            for (int i = 0; i < positiveExamplesByGroup.size() && !found; i++){
+                List<Example> ithGroup = positiveExamplesByGroup.get(i);
+                List<String> ithGroupAsList = exampleUtils.getExamplesAsListOfString(ithGroup);
+                found = (row.size() == ithGroupAsList.size()) && ((!ithGroupAsList.containsAll(row)) ? false : row.containsAll(ithGroupAsList));
+                if (found)
+                    positiveExamplesFoundCounter++;
+            }
+            for (int i = 0; i < negativeExamplesByGroup.size() && !found; i++){
+                List<Example> ithGroup = negativeExamplesByGroup.get(i);
+                List<String> ithGroupAsList = exampleUtils.getExamplesAsListOfString(ithGroup);
+                found = (row.size() == ithGroupAsList.size()) && ((!ithGroupAsList.containsAll(row)) ? false : row.containsAll(ithGroupAsList));
+                if (found)
+                    negativeExamplesFoundCounter++;
             }
         }
 
-        return svIndex;
+        return Math.log(((double)positiveExamplesFoundCounter) / (positiveExamplesFoundCounter + negativeExamplesFoundCounter));
     }
+
 
 }

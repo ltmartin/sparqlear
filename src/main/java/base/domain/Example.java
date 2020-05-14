@@ -1,6 +1,6 @@
 package base.domain;
 
-public class Example {
+public class Example implements Comparable<Example> {
     public static final Boolean CATEGORY_POSITIVE = true;
     public static final Boolean CATEGORY_NEGATIVE = false;
 
@@ -14,11 +14,6 @@ public class Example {
         this.example = example;
         this.category = category;
         this.position = position;
-    }
-
-    public Example(String example, Boolean category) {
-        this.example = example;
-        this.category = category;
     }
 
     public Integer getGroup() {
@@ -55,5 +50,16 @@ public class Example {
         result = 31 * result + example.hashCode();
         result = 31 * result + category.hashCode();
         return result;
+    }
+
+
+    @Override
+    public int compareTo(Example o) {
+        if (this.getGroup() != o.getGroup())
+            return this.getGroup().compareTo(o.getGroup());
+        else if (!this.getExample().equals(o.getExample()))
+            return this.getExample().compareTo(o.getExample());
+        else
+            return this.getPosition().compareTo(o.getPosition());
     }
 }

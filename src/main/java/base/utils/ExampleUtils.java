@@ -5,31 +5,29 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import java.text.ParseException;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 @Component
 @Lazy
-public class ExampleParser {
+public class ExampleUtils {
 
-    public Set<Example> parse(String examples) throws ParseException {
+    public Set<Example> parseExamples(String examples) throws ParseException {
         Set<Example> parsedExamples = new HashSet<>();
         if (checkStructure(examples)){
             boolean groupedExamples = examples.contains("<");
             Set<String> splittedStringExamples = new HashSet<>();
             splittedStringExamples.addAll(Arrays.asList(examples.split("\\s(?=\\+|-)")));
 
+            int groupId = 0;
             if (!groupedExamples){
-                splittedStringExamples.stream().forEach(e -> {
+                for (String e : splittedStringExamples){
                     boolean positive = e.charAt(0) == '+';
                     if (positive)
-                        parsedExamples.add(new Example(e.substring(1), Example.CATEGORY_POSITIVE));
+                        parsedExamples.add(new Example(groupId++, e.substring(1), Example.CATEGORY_POSITIVE, 0));
                     else
-                        parsedExamples.add(new Example(e.substring(1), Example.CATEGORY_NEGATIVE));
-                });
+                        parsedExamples.add(new Example(groupId++, e.substring(1), Example.CATEGORY_NEGATIVE, 0));
+                }
             } else {
-                int groupId = 0;
                 for (String e : splittedStringExamples) {
                     boolean positive = e.charAt(0) == '+';
                     String aux = e.substring(2, e.length() - 1);
@@ -54,5 +52,15 @@ public class ExampleParser {
     private boolean checkStructure(String examples) {
         String pattern = "^((\\+|-){1}((\\w+)|(<\\w+(,\\s\\w+)+>))\\s?)+$";
         return examples.matches(pattern);
+    }
+
+    public List<String> getExamplesAsListOfString(Collection<Example> exampleCollection){
+        List<String> result = new LinkedList<>();
+
+        for (Example e: exampleCollection) {
+            result.add(e.getExample());
+        }
+
+        return result;
     }
 }

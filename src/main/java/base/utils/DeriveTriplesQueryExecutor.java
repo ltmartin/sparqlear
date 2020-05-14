@@ -12,8 +12,8 @@ import java.util.concurrent.RecursiveTask;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class QueryExecutor extends RecursiveTask<Set<Triple>> {
-    private final Logger logger = Logger.getLogger(UtilsJena.class.getName());
+public class DeriveTriplesQueryExecutor extends RecursiveTask<Set<Triple>> {
+    private final Logger logger = Logger.getLogger(DeriveTriplesQueryExecutor.class.getName());
     public static final byte NONE_SELECTOR = 0;
     private final byte SUBJECT_SELECTOR = 1;
     private final byte PREDICATE_SELECTOR = 2;
@@ -37,9 +37,9 @@ public class QueryExecutor extends RecursiveTask<Set<Triple>> {
             case OBJECT_SELECTOR : { return runObjectQuery(); }
         }
 
-        QueryExecutor subjectQueryTask = new QueryExecutor(endpoint, exampleSubjectQuery, examplePredicateQuery, exampleObjectQuery, example, SUBJECT_SELECTOR);
-        QueryExecutor predicateQueryTask = new QueryExecutor(endpoint, exampleSubjectQuery, examplePredicateQuery, exampleObjectQuery, example, PREDICATE_SELECTOR);
-        QueryExecutor objectQueryTask = new QueryExecutor(endpoint, exampleSubjectQuery, examplePredicateQuery, exampleObjectQuery, example, OBJECT_SELECTOR);
+        DeriveTriplesQueryExecutor subjectQueryTask = new DeriveTriplesQueryExecutor(endpoint, exampleSubjectQuery, examplePredicateQuery, exampleObjectQuery, example, SUBJECT_SELECTOR);
+        DeriveTriplesQueryExecutor predicateQueryTask = new DeriveTriplesQueryExecutor(endpoint, exampleSubjectQuery, examplePredicateQuery, exampleObjectQuery, example, PREDICATE_SELECTOR);
+        DeriveTriplesQueryExecutor objectQueryTask = new DeriveTriplesQueryExecutor(endpoint, exampleSubjectQuery, examplePredicateQuery, exampleObjectQuery, example, OBJECT_SELECTOR);
 
         subjectQueryTask.fork();
         predicateQueryTask.fork();
@@ -52,7 +52,7 @@ public class QueryExecutor extends RecursiveTask<Set<Triple>> {
         return results;
     }
 
-    public QueryExecutor(String endpoint, String exampleSubjectQuery, String examplePredicateQuery, String exampleObjectQuery, String example, byte selector) {
+    public DeriveTriplesQueryExecutor(String endpoint, String exampleSubjectQuery, String examplePredicateQuery, String exampleObjectQuery, String example, byte selector) {
         this.endpoint = endpoint;
         this.exampleSubjectQuery = exampleSubjectQuery;
         this.examplePredicateQuery = examplePredicateQuery;

@@ -11,9 +11,9 @@ import java.text.ParseException;
 import java.util.Set;
 
 @SpringBootTest(classes = Application.class)
-class ExampleParserTest {
+class ExampleUtilsTest {
     @Resource
-    private ExampleParser exampleParser;
+    private ExampleUtils exampleUtils;
 
     @Test
     void parse() {
@@ -29,9 +29,9 @@ class ExampleParserTest {
     }
 
     boolean test1(String example){
-        Set<Example> expectedOutput = Set.of(new Example("Belgium", Example.CATEGORY_POSITIVE));
+        Set<Example> expectedOutput = Set.of(new Example(0, "Belgium", Example.CATEGORY_POSITIVE, 0));
         try {
-            Set<Example> output = exampleParser.parse(example);
+            Set<Example> output = exampleUtils.parseExamples(example);
             Assertions.assertTrue(expectedOutput.size() == output.size() && expectedOutput.containsAll(output) && output.containsAll(expectedOutput));
         } catch (ParseException e) {
             e.printStackTrace();
@@ -40,9 +40,9 @@ class ExampleParserTest {
     }
 
     boolean test2(String example){
-        Set<Example> expectedOutput = Set.of(new Example("Belgium", Example.CATEGORY_POSITIVE), new Example("Cuba", Example.CATEGORY_NEGATIVE));
+        Set<Example> expectedOutput = Set.of(new Example(0,"Belgium", Example.CATEGORY_POSITIVE, 0), new Example(1, "Cuba", Example.CATEGORY_NEGATIVE, 0));
         try {
-            Set<Example> output = exampleParser.parse(example);
+            Set<Example> output = exampleUtils.parseExamples(example);
             Assertions.assertTrue(expectedOutput.size() == output.size() && expectedOutput.containsAll(output) && output.containsAll(expectedOutput));
         } catch (ParseException e) {
             e.printStackTrace();
@@ -53,7 +53,7 @@ class ExampleParserTest {
     boolean test3(String example){
         Set<Example> expectedOutput = Set.of(new Example(0,"Rubens", Example.CATEGORY_POSITIVE, 0), new Example(0,"Belgium", Example.CATEGORY_POSITIVE, 1));
         try {
-            Set<Example> output = exampleParser.parse(example);
+            Set<Example> output = exampleUtils.parseExamples(example);
             Assertions.assertTrue(expectedOutput.size() == output.size() && expectedOutput.containsAll(output) && output.containsAll(expectedOutput));
         } catch (ParseException e) {
             e.printStackTrace();
@@ -71,7 +71,7 @@ class ExampleParserTest {
                 new Example(1,"Writer", Example.CATEGORY_POSITIVE, 2)
         );
         try {
-            Set<Example> output = exampleParser.parse(example);
+            Set<Example> output = exampleUtils.parseExamples(example);
             Assertions.assertTrue(expectedOutput.size() == output.size() && expectedOutput.containsAll(output) && output.containsAll(expectedOutput));
         } catch (ParseException e) {
             e.printStackTrace();
