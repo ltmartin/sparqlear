@@ -13,8 +13,6 @@ import java.util.Set;
 
 @SpringBootTest(classes = Application.class)
 class UtilsJenaTest {
-    @Value("${sparqlear.sparql.endpoint}")
-    private String endpoint;
     @Value("${sparqlear.test.example}")
     private String example;
     @Value("${sparqlear.sparql.candidateTriples.limit}")
@@ -25,7 +23,7 @@ class UtilsJenaTest {
     @Test
     public void deriveTriples(){
         try {
-            Set<Triple> results = utilsJena.deriveTriples(example, endpoint, Optional.empty(), limit);
+            Set<Triple> results = utilsJena.deriveTriples(example, Optional.empty(), limit);
             results.forEach((Triple t) -> System.out.println(t));
         } catch (IOException e) {
             e.printStackTrace();
