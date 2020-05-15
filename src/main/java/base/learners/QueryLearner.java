@@ -120,20 +120,39 @@ public class QueryLearner {
                 .sorted((Comparator.comparing(Hyperedge::getInformationGain).reversed()))
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
-        List<String> selectedVariables = new LinkedList<>();
         StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append("SELECT ");
+        stringBuilder.append("SELECT WHERE {}");
         for (Hyperedge e: hyperedges) {
             if (e.getTriple().getSubject().toString().startsWith(NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN).toString()))
-                stringBuilder.append(e.getTriple().getSubject().toString());
+                stringBuilder.insert(stringBuilder.indexOf("WHERE"), e.getTriple().getSubject().toString() + " ");
             if (e.getTriple().getPredicate().toString().startsWith(NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN).toString()))
-                stringBuilder.append(e.getTriple().getPredicate().toString());
+                stringBuilder.insert(stringBuilder.indexOf("WHERE"), e.getTriple().getPredicate().toString() + " ");
             if (e.getTriple().getObject().toString().startsWith(NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN).toString()))
-                stringBuilder.append(e.getTriple().getObject().toString());
-            // TODO: Continue this.
+                stringBuilder.insert(stringBuilder.indexOf("WHERE"), e.getTriple().getObject().toString() + " ");
+
+            stringBuilder.insert(stringBuilder.indexOf("}"), e.getTriple().toString() + ". ");
+            String candidateQuery = stringBuilder.toString();
+            Set<List<String>> valuation = utilsJena.runQuery(candidateQuery);
+
+            boolean areThereDisjointElements = joinSets(valuation, disjointSets);
         }
 
         return query;
+    }
+
+    private boolean joinSets(Set<List<String>> valuation, List<Set<String>> disjointSets) {
+        boolean areThereDisjointElements = false;
+        for (List<String> row: valuation) {
+            for (int i = 0; i < disjointSets.size(); i++) {
+                for (String value : row) {
+                    if (disjointSets.get(i).contains(value)){
+                        // FIXME: Finish this, try to find a better way to do it.
+                        areThereDisjointElements = true;
+                    }
+                }
+            }
+        }
+        return areThereDisjointElements;
     }
 
 
