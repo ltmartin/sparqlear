@@ -3,8 +3,6 @@ package base.utils;
 import base.domain.Example;
 import base.domain.ExampleEntry;
 import org.apache.commons.validator.routines.UrlValidator;
-import org.apache.jena.graph.Node;
-import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
 import org.apache.jena.query.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -25,6 +23,7 @@ import java.util.logging.Logger;
 @Lazy
 public class UtilsJena {
     private final Logger logger = Logger.getLogger(UtilsJena.class.getName());
+    public static final String SELECTED_VARIABLE_PATTERN = "sv";
 
     @Value("${sparqlear.sparql.endpoint}")
     private String endpoint;
@@ -82,13 +81,12 @@ public class UtilsJena {
         return UrlValidator.getInstance().isValid(example) ? "<" + example + ">" : "'" + example + "'";
     }
 
-    public Set runCompleteQueryForHyperedges(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Set<Example> parsedExamples){
-        int selectedVariablesAmount = introduceVariables(componentCandidateTriples, parsedExamples);
+    public Set<List<String>> runCompleteQueryForHyperedges(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Set<Example> parsedExamples, int selectedVariablesAmount){
         StringBuilder stringBuilder = new StringBuilder();
 
         stringBuilder.append("SELECT ");
         for (int i = 0; i < selectedVariablesAmount; i++)
-            stringBuilder.append("?sv" + i + ", ");
+            stringBuilder.append("?" + SELECTED_VARIABLE_PATTERN + i + ", ");
         stringBuilder.deleteCharAt(stringBuilder.lastIndexOf(","));
         stringBuilder.append("WHERE { ");
         for (ExampleEntry<String, Triple> cct: componentCandidateTriples)
@@ -97,6 +95,31 @@ public class UtilsJena {
 
         String query = stringBuilder.toString();
 
+        return runQuery(query);
+    }
+
+
+    public Set<List<String>> runPartialQueryForHyperedges(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Set<Example> parsedExamples, ExampleEntry<String, Triple> cct, int selectedVariablesAmount) {
+        StringBuilder stringBuilder = new StringBuilder();
+
+        stringBuilder.append("SELECT ");
+        for (int i = 0; i < selectedVariablesAmount; i++)
+            stringBuilder.append("?" + SELECTED_VARIABLE_PATTERN + i + ", ");
+        stringBuilder.deleteCharAt(stringBuilder.lastIndexOf(","));
+        stringBuilder.append("WHERE { ");
+        for (ExampleEntry<String, Triple> candidateTriple: componentCandidateTriples) {
+            if (!cct.equals(candidateTriple))
+                stringBuilder.append(candidateTriple.getValue().toString() + ".");
+        }
+        stringBuilder.append("}");
+
+        String query = stringBuilder.toString();
+
+        return runQuery(query);
+
+    }
+
+    public Set<List<String>> runQuery(String query) {
         Set<List<String>> results = new HashSet<>();
 
         try (QueryExecution qexec = QueryExecutionFactory.sparqlService(endpoint, query)) {
@@ -119,53 +142,4 @@ public class UtilsJena {
 
         return results;
     }
-
-    private int introduceVariables(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Set<Example> parsedExamples) {
-        int svIndex = 0, nsvIndex = 0;
-        Map<String, Node> variableNames = new HashMap<>();
-        for (ExampleEntry<String, Triple> cct: componentCandidateTriples) {
-            boolean isExampleProvidedByUser = parsedExamples.stream().filter(example -> example.getExample().equals(cct.getKey())).count() != 0;
-
-            if (cct.getValue().getSubject().toString().equals(cct.getKey())){
-                Node newSubject;
-                if (!variableNames.containsKey(cct.getKey())) {
-                    if (isExampleProvidedByUser)
-                        newSubject = NodeFactory.createVariable("sv" + svIndex++);
-                    else
-                        newSubject = NodeFactory.createVariable("x" + nsvIndex++);
-
-                    variableNames.put(cct.getKey(), newSubject);
-                    cct.setValue(new Triple(newSubject, cct.getValue().getPredicate(), cct.getValue().getObject()));
-                } else
-                    cct.setValue(new Triple(variableNames.get(cct.getKey()), cct.getValue().getPredicate(), cct.getValue().getObject()));
-            } else if (cct.getValue().getPredicate().toString().equals(cct.getKey())){
-                Node newPredicate;
-                if (!variableNames.containsKey(cct.getKey())) {
-                    if (isExampleProvidedByUser)
-                        newPredicate = NodeFactory.createVariable("sv" + svIndex++);
-                    else
-                        newPredicate = NodeFactory.createVariable("x" + nsvIndex++);
-
-                    variableNames.put(cct.getKey(), newPredicate);
-                    cct.setValue(new Triple(cct.getValue().getSubject(), newPredicate, cct.getValue().getObject()));
-                } else
-                    cct.setValue(new Triple(cct.getValue().getSubject(), variableNames.get(cct.getKey()), cct.getValue().getObject()));
-            } else if (cct.getValue().getObject().toString().equals(cct.getKey())){
-                Node newObject;
-                if (!variableNames.containsKey(cct.getKey())) {
-                    if (isExampleProvidedByUser)
-                        newObject = NodeFactory.createVariable("sv" + svIndex++);
-                    else
-                        newObject = NodeFactory.createVariable("x" + nsvIndex++);
-
-                    variableNames.put(cct.getKey(), newObject);
-                    cct.setValue(new Triple(cct.getValue().getSubject(), cct.getValue().getPredicate(), newObject));
-                } else
-                    cct.setValue(new Triple(cct.getValue().getSubject(), cct.getValue().getPredicate(), variableNames.get(cct.getKey())));
-            }
-        }
-
-        return svIndex;
-    }
-
 }

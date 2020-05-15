@@ -4,9 +4,9 @@ import org.apache.jena.graph.Triple;
 
 public class Hyperedge {
     private Triple triple;
-    private float informationGain;
+    private double informationGain;
 
-    public Hyperedge(Triple triple, float informationGain) {
+    public Hyperedge(Triple triple, double informationGain) {
         this.triple = triple;
         this.informationGain = informationGain;
     }
@@ -19,11 +19,11 @@ public class Hyperedge {
         this.triple = triple;
     }
 
-    public float getInformationGain() {
+    public double getInformationGain() {
         return informationGain;
     }
 
-    public void setInformationGain(float informationGain) {
+    public void setInformationGain(double informationGain) {
         this.informationGain = informationGain;
     }
 }
