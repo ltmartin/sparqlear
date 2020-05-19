@@ -151,6 +151,7 @@ public class QueryLearner {
                         areThereDisjointElements = true;
                     }
                 }
+                disjointSets.add(setToJoinElements);
                 if (disjointSets.size() == 1)
                     return areThereDisjointElements;
             }
