@@ -149,6 +149,7 @@ public class QueryLearner {
                         setToJoinElements.addAll(elementsInDisjointSet);
                         disjointSets.remove(i--);
                         areThereDisjointElements = true;
+                        break;
                     }
                 }
                 if (areThereDisjointElements)
