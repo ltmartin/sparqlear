@@ -140,9 +140,9 @@ public class QueryLearner {
 
     private boolean joinSets(Set<List<String>> valuation, List<Set<String>> disjointSets) {
         boolean areThereDisjointElements = false;
-        Set<String> setToJoinElements = new HashSet<>();
         for (List<String> row : valuation){
             for (String value: row) {
+                Set<String> setToJoinElements = new HashSet<>();
                 for (int i = 0; i < disjointSets.size(); i++) {
                     Set<String> elementsInDisjointSet = disjointSets.get(i);
                     if (elementsInDisjointSet.contains(value)){
@@ -151,7 +151,8 @@ public class QueryLearner {
                         areThereDisjointElements = true;
                     }
                 }
-                disjointSets.add(setToJoinElements);
+                if (areThereDisjointElements)
+                    disjointSets.add(setToJoinElements);
                 if (disjointSets.size() == 1)
                     return areThereDisjointElements;
             }
