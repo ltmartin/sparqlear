@@ -47,21 +47,16 @@ public class QueryLearner {
     private Boolean useRanking;
     @Value("${sparqlear.informationGain.threshold}")
     private double informationGainThreshold;
-    // Used to select from which example start the learning process.
-    private int initialGroup = -1;
+    @Value("${sparqlear.learnMultipleQueries}")
+    private Boolean learnMultipleQueries;
 
     public Set<String> learn(String examples) throws ParseException, ExampleException, IOException {
         Set<String> derivedQueries = new HashSet<>();
         Set<String> parsedDatasets = null;
-        initialGroup++;
 
         logger.log(Level.INFO, "Parsing examples...");
         Set<Example> parsedExamples = exampleUtils.parseExamples(examples);
         logger.log(Level.INFO, "Examples parsed.");
-
-        int examplesGroupsQuantity = parsedExamples.stream().collect(Collectors.groupingBy(Example::getGroup)).size();
-        if (initialGroup >= examplesGroupsQuantity)
-            throw new ExampleException("Not enough examples to learn.");
 
         if (!datasets.isEmpty()) {
             logger.log(Level.INFO, "Parsing datasets...");
@@ -72,31 +67,30 @@ public class QueryLearner {
         Map<Boolean, List<Example>> categorizedExamples = parsedExamples.stream()
                 .collect(Collectors.groupingBy(Example::getCategory));
 
-        if (null == parsedDatasets) {
-            boolean multipleVariableExamples = null != parsedExamples.iterator().next().getGroup();
+        int numberOfPositiveExamples = categorizedExamples.get(Example.CATEGORY_POSITIVE).size();
+        for (int initialGroup = 0; initialGroup < numberOfPositiveExamples; initialGroup++) {
+            if (null == parsedDatasets) {
+                final int ig = initialGroup;
+                Set<Example> positiveExampleGroup = categorizedExamples.get(Example.CATEGORY_POSITIVE).stream()
+                        .filter(example -> example.getGroup().equals(ig))
+                        .collect(Collectors.toSet());
 
-            Set<Example> positiveExampleGroup = new HashSet<>();
-            if (!multipleVariableExamples)
-                positiveExampleGroup = Set.of(parsedExamples.iterator().next());
-            else {
-                positiveExampleGroup.addAll(categorizedExamples.get(Example.CATEGORY_POSITIVE).stream()
-                        .takeWhile(example -> example.getGroup().equals(initialGroup))
-                        .collect(Collectors.toSet()));
+                Set<Hyperedge> hyperedges = constructHyperedges(positiveExampleGroup, parsedExamples);
+
+                Set<Example> positiveExamples = new HashSet<>(categorizedExamples.get(Example.CATEGORY_POSITIVE));
+
+                String query = buildQuery(positiveExamples, hyperedges);
+                double queryInformationGain = computeInformationGain(utilsJena.runQuery(query), categorizedExamples);
+                if (informationGainThreshold <= queryInformationGain) {
+                    derivedQueries.add(query);
+                    if (learnMultipleQueries)
+                        break;
+                }
+
+            } else {
+                // TODO: Create the flow for learning from multiple datasets.
             }
-
-            Set<Hyperedge> hyperedges = constructHyperedges(positiveExampleGroup, parsedExamples);
-
-            Set<Example> positiveExamples = new HashSet<>(categorizedExamples.get(Example.CATEGORY_POSITIVE));
-
-            String query = buildQuery(positiveExamples, hyperedges);
-            if (informationGainThreshold <= computeInformationGain(utilsJena.runQuery(query), categorizedExamples)) {
-                derivedQueries.add(query);
-            }
-
-        } else {
-            // TODO: Create the flow for learning from multiple datasets.
         }
-
 
         return derivedQueries;
     }
@@ -135,6 +129,10 @@ public class QueryLearner {
             Set<List<String>> valuation = utilsJena.runQuery(candidateQuery);
 
             boolean areThereDisjointElements = joinSets(valuation, disjointSets);
+            if (areThereDisjointElements)
+                query = candidateQuery;
+            if (disjointSets.size() == 1)
+                break;
         }
 
         return query;
@@ -142,16 +140,22 @@ public class QueryLearner {
 
     private boolean joinSets(Set<List<String>> valuation, List<Set<String>> disjointSets) {
         boolean areThereDisjointElements = false;
-        for (List<String> row: valuation) {
-            for (int i = 0; i < disjointSets.size(); i++) {
-                for (String value : row) {
-                    if (disjointSets.get(i).contains(value)){
-                        // FIXME: Finish this, try to find a better way to do it.
+        Set<String> setToJoinElements = new HashSet<>();
+        for (List<String> row : valuation){
+            for (String value: row) {
+                for (int i = 0; i < disjointSets.size(); i++) {
+                    Set<String> elementsInDisjointSet = disjointSets.get(i);
+                    if (elementsInDisjointSet.contains(value)){
+                        setToJoinElements.addAll(elementsInDisjointSet);
+                        disjointSets.remove(i--);
                         areThereDisjointElements = true;
                     }
                 }
+                if (disjointSets.size() == 1)
+                    return areThereDisjointElements;
             }
         }
+
         return areThereDisjointElements;
     }
 
