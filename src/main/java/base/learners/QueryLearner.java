@@ -219,7 +219,7 @@ public class QueryLearner {
         for (ExampleEntry<String, Triple> cct : componentCandidateTriples) {
             boolean isExampleProvidedByUser = parsedExamples.stream().filter(example -> example.getExample().equals(cct.getKey())).count() != 0;
 
-            if (cct.getValue().getSubject().toString().equals(cct.getKey())) {
+            if (UtilsJena.getCanonicalExample(cct.getValue().getSubject().toString()).equals(cct.getKey())) {
                 Node newSubject;
                 if (!variableNames.containsKey(cct.getKey())) {
                     if (isExampleProvidedByUser)
@@ -250,7 +250,7 @@ public class QueryLearner {
                         triplesBySelectedVariable.replace(cct.getValue().getSubject().toString(), tripleList);
                     }
                 }
-            } else if (cct.getValue().getPredicate().toString().equals(cct.getKey())) {
+            } else if (UtilsJena.getCanonicalExample(cct.getValue().getPredicate().toString()).equals(cct.getKey())) {
                 Node newPredicate;
                 if (!variableNames.containsKey(cct.getKey())) {
                     if (isExampleProvidedByUser)
@@ -281,7 +281,7 @@ public class QueryLearner {
                         triplesBySelectedVariable.replace(cct.getValue().getPredicate().toString(), tripleList);
                     }
                 }
-            } else if (cct.getValue().getObject().toString().equals(cct.getKey())) {
+            } else if (UtilsJena.getCanonicalExample(cct.getValue().getObject().toString()).equals(cct.getKey())) {
                 Node newObject;
                 if (!variableNames.containsKey(cct.getKey())) {
                     if (isExampleProvidedByUser)
@@ -319,7 +319,10 @@ public class QueryLearner {
 
     private double computeInformationGain(Set<List<String>> queryValuation, Map<Boolean, List<Example>> examples) {
         Map<Integer, List<Example>> positiveExamplesByGroup = examples.get(Example.CATEGORY_POSITIVE).stream().collect(Collectors.groupingBy(Example::getGroup));
-        Map<Integer, List<Example>> negativeExamplesByGroup = examples.get(Example.CATEGORY_NEGATIVE).stream().collect(Collectors.groupingBy(Example::getGroup));
+        Map<Integer, List<Example>> negativeExamplesByGroup = new HashMap<>();
+        // TODO: Continue debugging here.
+        if (null != examples.get(Example.CATEGORY_NEGATIVE))
+            negativeExamplesByGroup = examples.get(Example.CATEGORY_NEGATIVE).stream().collect(Collectors.groupingBy(Example::getGroup));
 
         int positiveExamplesFoundCounter = 0;
         int negativeExamplesFoundCounter = 0;

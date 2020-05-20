@@ -90,12 +90,43 @@ public class UtilsJena {
         stringBuilder.deleteCharAt(stringBuilder.lastIndexOf(","));
         stringBuilder.append("WHERE { ");
         for (ExampleEntry<String, Triple> cct: componentCandidateTriples)
-            stringBuilder.append(cct.getValue().toString() + ".");
+            stringBuilder.append(getSparqlCompatibleTriple(cct.getValue()) + ". ");
         stringBuilder.append("}");
 
         String query = stringBuilder.toString();
 
         return runQuery(query);
+    }
+
+    private String getSparqlCompatibleTriple(Triple value) {
+        String subject = value.getSubject().toString();
+        String predicate = value.getPredicate().toString();
+        String object = value.getObject().toString();
+
+        final String HTTP_PREFIX = "http://";
+        final String HTTPS_PREFIX = "https://";
+        subject = insertBrackets(subject, HTTP_PREFIX, HTTPS_PREFIX);
+
+        predicate = insertBrackets(predicate, HTTP_PREFIX, HTTPS_PREFIX);
+
+        object = insertBrackets(object, HTTP_PREFIX, HTTPS_PREFIX);
+
+        return subject + " " + predicate + " " + object + " ";
+    }
+
+    private String insertBrackets(String element, String HTTP_PREFIX, String HTTPS_PREFIX) {
+        if (element.contains(HTTP_PREFIX)){
+            StringBuilder stringBuilder = new StringBuilder(element);
+            stringBuilder.insert(stringBuilder.indexOf(HTTP_PREFIX),"<");
+            stringBuilder.append(">");
+            element = stringBuilder.toString();
+        } else if (element.contains(HTTPS_PREFIX)){
+            StringBuilder stringBuilder = new StringBuilder(element);
+            stringBuilder.insert(stringBuilder.indexOf(HTTPS_PREFIX),"<");
+            stringBuilder.append(">");
+            element = stringBuilder.toString();
+        }
+        return element;
     }
 
 
@@ -109,7 +140,7 @@ public class UtilsJena {
         stringBuilder.append("WHERE { ");
         for (ExampleEntry<String, Triple> candidateTriple: componentCandidateTriples) {
             if (!cct.equals(candidateTriple))
-                stringBuilder.append(candidateTriple.getValue().toString() + ".");
+                stringBuilder.append(getSparqlCompatibleTriple(candidateTriple.getValue()) + ". ");
         }
         stringBuilder.append("}");
 
@@ -133,6 +164,7 @@ public class UtilsJena {
                     String value = row.get(variableName).toString();
                     rowValues.add(value);
                 }
+                results.add(rowValues);
             }
         } catch (QueryParseException e){
             System.out.println("===============================================");
