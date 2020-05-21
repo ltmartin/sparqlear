@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -27,6 +28,10 @@ public class UtilsJena {
 
     @Value("${sparqlear.sparql.endpoint}")
     private String endpoint;
+    @Value("${sparqlear.sparql.results.limit}")
+    private String resultsLimit;
+    @Value("${sparqlear.sparql.timeout}")
+    private Integer timeout;
 
     /**
      * Method to derive the triples directly related with a example.
@@ -91,7 +96,8 @@ public class UtilsJena {
         stringBuilder.append("WHERE { ");
         for (ExampleEntry<String, Triple> cct: componentCandidateTriples)
             stringBuilder.append(getSparqlCompatibleTriple(cct.getValue()) + ". ");
-        stringBuilder.append("}");
+        stringBuilder.append("} LIMIT ");
+        stringBuilder.append(resultsLimit);
 
         String query = stringBuilder.toString();
 
@@ -142,7 +148,8 @@ public class UtilsJena {
             if (!cct.equals(candidateTriple))
                 stringBuilder.append(getSparqlCompatibleTriple(candidateTriple.getValue()) + ". ");
         }
-        stringBuilder.append("}");
+        stringBuilder.append("} LIMIT ");
+        stringBuilder.append(resultsLimit);
 
         String query = stringBuilder.toString();
 
@@ -154,6 +161,7 @@ public class UtilsJena {
         Set<List<String>> results = new HashSet<>();
 
         try (QueryExecution qexec = QueryExecutionFactory.sparqlService(endpoint, query)) {
+            qexec.setTimeout(timeout, TimeUnit.MINUTES);
             ResultSet rs = qexec.execSelect();
             while (rs.hasNext()) {
                 QuerySolution row = rs.next();

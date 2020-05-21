@@ -117,11 +117,12 @@ public class QueryLearner {
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.append("SELECT WHERE {}");
         for (Hyperedge e: hyperedges) {
-            if (e.getTriple().getSubject().toString().startsWith(NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN).toString()))
+
+            if (e.getTriple().getSubject().toString().startsWith(NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN).toString()) && !stringBuilder.toString().contains(e.getTriple().getSubject().toString()))
                 stringBuilder.insert(stringBuilder.indexOf("WHERE"), e.getTriple().getSubject().toString() + " ");
-            if (e.getTriple().getPredicate().toString().startsWith(NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN).toString()))
+            if (e.getTriple().getPredicate().toString().startsWith(NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN).toString()) && !stringBuilder.toString().contains(e.getTriple().getPredicate().toString()))
                 stringBuilder.insert(stringBuilder.indexOf("WHERE"), e.getTriple().getPredicate().toString() + " ");
-            if (e.getTriple().getObject().toString().startsWith(NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN).toString()))
+            if (e.getTriple().getObject().toString().startsWith(NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN).toString()) && !stringBuilder.toString().contains(e.getTriple().getObject().toString()))
                 stringBuilder.insert(stringBuilder.indexOf("WHERE"), e.getTriple().getObject().toString() + " ");
 
             stringBuilder.insert(stringBuilder.indexOf("}"), e.getTriple().toString() + ". ");
@@ -197,7 +198,8 @@ public class QueryLearner {
 
             double totalInformationGain = computeInformationGain(completeQueryValuation, categorizedExamples);
 
-            componentCandidateTriples.parallelStream().forEach(cct -> {
+            // FIXME: Make this parallel
+            componentCandidateTriples.stream().forEach(cct -> {
                 Set<List<String>> partialQueryValuation = utilsJena.runPartialQueryForHyperedges(componentCandidateTriples, parsedExamples, cct, selectedVariablesAmount);
                 double cctInformationGain = totalInformationGain - computeInformationGain(partialQueryValuation, categorizedExamples);
                 hyperedges.add(new Hyperedge(cct.getValue(), cctInformationGain));
@@ -220,15 +222,18 @@ public class QueryLearner {
             boolean isExampleProvidedByUser = parsedExamples.stream().filter(example -> example.getExample().equals(cct.getKey())).count() != 0;
 
             if (UtilsJena.getCanonicalExample(cct.getValue().getSubject().toString()).equals(cct.getKey())) {
-                Node newSubject;
+                Node newSubject, newObject;
                 if (!variableNames.containsKey(cct.getKey())) {
                     if (isExampleProvidedByUser)
                         newSubject = NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN + svIndex++);
                     else
                         newSubject = NodeFactory.createVariable("x" + nsvIndex++);
 
+                    newObject = NodeFactory.createVariable("x" + nsvIndex++);
+
                     variableNames.put(cct.getKey(), newSubject);
-                    cct.setValue(new Triple(newSubject, cct.getValue().getPredicate(), cct.getValue().getObject()));
+                    variableNames.put(cct.getValue().getObject().toString(), newObject);
+                    cct.setValue(new Triple(newSubject, cct.getValue().getPredicate(), newObject));
 
                     if (newSubject.toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN)) {
                         if (!triplesBySelectedVariable.containsKey(newSubject.toString())) {
@@ -242,7 +247,11 @@ public class QueryLearner {
                         }
                     }
                 } else {
-                    cct.setValue(new Triple(variableNames.get(cct.getKey()), cct.getValue().getPredicate(), cct.getValue().getObject()));
+                    if (!variableNames.containsKey(cct.getValue().getObject().toString())) {
+                        newObject = NodeFactory.createVariable("x" + nsvIndex++);
+                        variableNames.put(cct.getValue().getObject().toString(), newObject);
+                    }
+                    cct.setValue(new Triple(variableNames.get(cct.getKey()), cct.getValue().getPredicate(), variableNames.get(cct.getValue().getObject().toString())));
 
                     if (cct.getValue().getSubject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN)) {
                         List<Triple> tripleList = triplesBySelectedVariable.get(cct.getValue().getSubject().toString());
@@ -282,15 +291,18 @@ public class QueryLearner {
                     }
                 }
             } else if (UtilsJena.getCanonicalExample(cct.getValue().getObject().toString()).equals(cct.getKey())) {
-                Node newObject;
+                Node newSubject, newObject;
                 if (!variableNames.containsKey(cct.getKey())) {
                     if (isExampleProvidedByUser)
                         newObject = NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN + svIndex++);
                     else
                         newObject = NodeFactory.createVariable("x" + nsvIndex++);
 
+                    newSubject = NodeFactory.createVariable("x" + nsvIndex++);
+
                     variableNames.put(cct.getKey(), newObject);
-                    cct.setValue(new Triple(cct.getValue().getSubject(), cct.getValue().getPredicate(), newObject));
+                    variableNames.put(cct.getValue().getSubject().toString(), newSubject);
+                    cct.setValue(new Triple(newSubject, cct.getValue().getPredicate(), newObject));
 
                     if (newObject.toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN)) {
                         if (!triplesBySelectedVariable.containsKey(newObject.toString())) {
@@ -304,7 +316,11 @@ public class QueryLearner {
                         }
                     }
                 } else {
-                    cct.setValue(new Triple(cct.getValue().getSubject(), cct.getValue().getPredicate(), variableNames.get(cct.getKey())));
+                    if (!variableNames.containsKey(cct.getValue().getSubject().toString())) {
+                        newSubject = NodeFactory.createVariable("x" + nsvIndex++);
+                        variableNames.put(cct.getValue().getSubject().toString(), newSubject);
+                    }
+                    cct.setValue(new Triple(variableNames.get(cct.getValue().getSubject().toString()), cct.getValue().getPredicate(), variableNames.get(cct.getKey())));
 
                     if (cct.getValue().getObject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN)) {
                         List<Triple> tripleList = triplesBySelectedVariable.get(cct.getValue().getObject().toString());
@@ -320,7 +336,6 @@ public class QueryLearner {
     private double computeInformationGain(Set<List<String>> queryValuation, Map<Boolean, List<Example>> examples) {
         Map<Integer, List<Example>> positiveExamplesByGroup = examples.get(Example.CATEGORY_POSITIVE).stream().collect(Collectors.groupingBy(Example::getGroup));
         Map<Integer, List<Example>> negativeExamplesByGroup = new HashMap<>();
-        // TODO: Continue debugging here.
         if (null != examples.get(Example.CATEGORY_NEGATIVE))
             negativeExamplesByGroup = examples.get(Example.CATEGORY_NEGATIVE).stream().collect(Collectors.groupingBy(Example::getGroup));
 
