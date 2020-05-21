@@ -43,7 +43,7 @@ public class TripleFinder {
         if (verifyPredicatesRank)
             rankedProperties = propertiesService.loadProperties();
 
-        logger.log(Level.INFO, "Starting to derive candidate triples...");
+
         Set<ExampleEntry<String, Triple>> candidateTriples = new QueueSet<>();
         Set<ExampleEntry<String, Triple>> queue;
         try {
@@ -71,7 +71,7 @@ public class TripleFinder {
         } catch (IOException e) {
             throw new IOException("Please check the endpoint and dataset parameters.");
         }
-        logger.log(Level.INFO, "Candidate triples successfully derived.");
+
         return candidateTriples;
     }
 

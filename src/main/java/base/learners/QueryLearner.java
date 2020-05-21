@@ -67,8 +67,24 @@ public class QueryLearner {
         Map<Boolean, List<Example>> categorizedExamples = parsedExamples.stream()
                 .collect(Collectors.groupingBy(Example::getCategory));
 
-        int numberOfPositiveExamples = categorizedExamples.get(Example.CATEGORY_POSITIVE).size();
-        for (int initialGroup = 0; initialGroup < numberOfPositiveExamples; initialGroup++) {
+        Set<Example> positiveExamples = new HashSet<>(categorizedExamples.get(Example.CATEGORY_POSITIVE));
+        Map<Integer, List<Example>> positiveExamplesByComponent = positiveExamples.stream().collect(Collectors.groupingBy(Example::getPosition));
+        Set<Integer> componentKeys = positiveExamplesByComponent.keySet();
+
+        Set<ExampleEntry<String, Triple>> candidateTriples = new HashSet<>();
+        logger.log(Level.INFO, "Starting to derive candidate triples...");
+        for (Integer componentKey: componentKeys) {
+            List<Example> componentExamples = positiveExamplesByComponent.get(componentKey);
+            for (Example componentExample : componentExamples) {
+                candidateTriples.addAll(tripleFinder.deriveCandidateTriples(componentExample.getExample(), Optional.empty()));
+            }
+
+        }
+        logger.log(Level.INFO, "Candidate triples successfully derived.");
+
+        // FIXME: Filtrar las tripletas y quedarme con las comunes a cada componente de todos los ejemplos. Y cambiar lo que sigue debajo.
+
+        for (int initialGroup = 0; initialGroup < positiveExamples.size(); initialGroup++) {
             if (null == parsedDatasets) {
                 final int ig = initialGroup;
                 Set<Example> positiveExampleGroup = categorizedExamples.get(Example.CATEGORY_POSITIVE).stream()
@@ -76,8 +92,6 @@ public class QueryLearner {
                         .collect(Collectors.toSet());
 
                 Set<Hyperedge> hyperedges = constructHyperedges(positiveExampleGroup, parsedExamples);
-
-                Set<Example> positiveExamples = new HashSet<>(categorizedExamples.get(Example.CATEGORY_POSITIVE));
 
                 String query = buildQuery(positiveExamples, hyperedges);
                 double queryInformationGain = computeInformationGain(utilsJena.runQuery(query), categorizedExamples);
@@ -165,16 +179,17 @@ public class QueryLearner {
 
 
     /**
-     * @param positiveExampleGroup A single positive example. It could be a single variable example (e.g. +Cuba) or a multiple variables example (e.g. +<Jose, Cuba, Writer>)
+     * @param candidateTriples A set of common candidate triples for each component of the examples.
      * @param parsedExamples       the set of parsed examples.
      */
-    private Set<Hyperedge> constructHyperedges(Set<Example> positiveExampleGroup, Set<Example> parsedExamples) throws IOException {
+    private Set<Hyperedge> constructHyperedges(Set<ExampleEntry<String, Triple>> candidateTriples, Set<Example> parsedExamples) throws IOException {
         Set<Hyperedge> hyperedges = new HashSet<>();
         Map<Boolean, List<Example>> categorizedExamples = parsedExamples.stream().collect(Collectors.groupingBy(Example::getCategory));
+        List<Example> positiveExamples = categorizedExamples.get(Example.CATEGORY_POSITIVE);
 
-        for (Example c : positiveExampleGroup) {
+        for (Example c : positiveExamples) {
 
-            Set<ExampleEntry<String, Triple>> componentCandidateTriples = tripleFinder.deriveCandidateTriples(c.getExample(), Optional.empty());
+            Set<ExampleEntry<String, Triple>> componentCandidateTriples = candidateTriples.stream().filter(example -> example.getKey().equals(c.getExample())).collect(Collectors.toSet());
 
             Map<String, List<Triple>> triplesBySelectedVariable = new HashMap<>();
             int selectedVariablesAmount = introduceVariables(componentCandidateTriples, parsedExamples, triplesBySelectedVariable);
