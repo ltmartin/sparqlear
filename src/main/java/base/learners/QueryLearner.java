@@ -71,42 +71,98 @@ public class QueryLearner {
         Map<Integer, List<Example>> positiveExamplesByComponent = positiveExamples.stream().collect(Collectors.groupingBy(Example::getPosition));
         Set<Integer> componentKeys = positiveExamplesByComponent.keySet();
 
-        Set<ExampleEntry<String, Triple>> candidateTriples = new HashSet<>();
+        Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples = new HashMap<>();
         logger.log(Level.INFO, "Starting to derive candidate triples...");
-        for (Integer componentKey: componentKeys) {
+        for (Integer componentKey : componentKeys) {
             List<Example> componentExamples = positiveExamplesByComponent.get(componentKey);
             for (Example componentExample : componentExamples) {
-                candidateTriples.addAll(tripleFinder.deriveCandidateTriples(componentExample.getExample(), Optional.empty()));
+                candidateTriples.put(componentExample, tripleFinder.deriveCandidateTriples(componentExample.getExample(), Optional.empty()));
             }
 
         }
         logger.log(Level.INFO, "Candidate triples successfully derived.");
 
-        // FIXME: Filtrar las tripletas y quedarme con las comunes a cada componente de todos los ejemplos. Y cambiar lo que sigue debajo.
-
-        for (int initialGroup = 0; initialGroup < positiveExamples.size(); initialGroup++) {
-            if (null == parsedDatasets) {
-                final int ig = initialGroup;
-                Set<Example> positiveExampleGroup = categorizedExamples.get(Example.CATEGORY_POSITIVE).stream()
-                        .filter(example -> example.getGroup().equals(ig))
-                        .collect(Collectors.toSet());
-
-                Set<Hyperedge> hyperedges = constructHyperedges(positiveExampleGroup, parsedExamples);
-
-                String query = buildQuery(positiveExamples, hyperedges);
-                double queryInformationGain = computeInformationGain(utilsJena.runQuery(query), categorizedExamples);
-                if (informationGainThreshold <= queryInformationGain) {
-                    derivedQueries.add(query);
-                    if (learnMultipleQueries)
-                        break;
-                }
-
-            } else {
-                // TODO: Create the flow for learning from multiple datasets.
-            }
+        if (null == parsedDatasets) {
+            candidateTriples = filterCommonTriples(candidateTriples, positiveExamplesByComponent);
+            Set<Hyperedge> hyperedges = constructHyperedges(candidateTriples, parsedExamples);
+            String query = buildQuery(positiveExamples, hyperedges);
+            derivedQueries.add(query);
+        } else {
+            // TODO: Create the flow for learning from multiple datasets.
         }
 
+
         return derivedQueries;
+    }
+
+    private Map<Example, Set<ExampleEntry<String, Triple>>> filterCommonTriples(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples, Map<Integer, List<Example>> positiveExamplesByComponent) {
+        Map<Example, Set<ExampleEntry<String, Triple>>> commonTriples = new HashMap<>();
+
+        Set<Integer> keys = positiveExamplesByComponent.keySet();
+        for (Integer key : keys) {
+            List<Example> examples = positiveExamplesByComponent.get(key);
+            // the structure of this map is <UserProvidedExample, Set of triples that belongs to that example>
+            Map<Example, Set<ExampleEntry<String, Triple>>> componentCandidateTriples = new HashMap<>();
+
+            for (Example example : examples) {
+                Set<Example> candidateTriplesKeySet = candidateTriples.keySet();
+                candidateTriplesKeySet.stream().forEach(ctKey -> {
+                    if (example.equals(ctKey))
+                        componentCandidateTriples.put(ctKey, candidateTriples.get(ctKey));
+                });
+            }
+
+            Example example = examples.get(0);
+
+            Set<ExampleEntry<String, Triple>> exampleCandidateTriples = componentCandidateTriples.get(example);
+
+            Map<Example, Set<ExampleEntry<String, Triple>>> otherComponentTriples = new HashMap<>();
+            Set<Example> componentTriplesKeySet = componentCandidateTriples.keySet();
+            componentTriplesKeySet.stream().forEach(ctKey -> {
+                if (!ctKey.equals(example))
+                    otherComponentTriples.put(ctKey, componentCandidateTriples.get(ctKey));
+            });
+
+            for (ExampleEntry<String, Triple> ect : exampleCandidateTriples) {
+                boolean common = false;
+                Set<Example> exampleKeys = otherComponentTriples.keySet();
+                for (Example ek : exampleKeys) {
+                    Set<ExampleEntry<String, Triple>> triples = otherComponentTriples.get(ek);
+                    for (ExampleEntry<String, Triple> entry : triples) {
+                        if (entry.getValue().getPredicate().equals(ect.getValue().getPredicate())) {
+                            common = true;
+                            break;
+                        } else
+                            common = false;
+                    }
+                }
+                if (common) {
+                    Set<ExampleEntry<String, Triple>> triples = null;
+                    if (commonTriples.containsKey(example)) {
+                        triples = commonTriples.get(example);
+                        boolean alreadyAdded = false;
+
+                        for (ExampleEntry<String, Triple> entry : triples) {
+                            if (entry.getValue().getPredicate().equals(ect.getValue().getPredicate())) {
+                                alreadyAdded = true;
+                                break;
+                            }
+                        }
+
+                        if (!alreadyAdded) {
+                            triples.add(ect);
+                            commonTriples.replace(example, triples);
+                        }
+                    } else {
+                        triples = new HashSet<>();
+                        triples.add(ect);
+                        commonTriples.put(example, triples);
+                    }
+                }
+            }
+
+        }
+        return commonTriples;
     }
 
     /**
@@ -130,7 +186,7 @@ public class QueryLearner {
 
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.append("SELECT WHERE {}");
-        for (Hyperedge e: hyperedges) {
+        for (Hyperedge e : hyperedges) {
 
             if (e.getTriple().getSubject().toString().startsWith(NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN).toString()) && !stringBuilder.toString().contains(e.getTriple().getSubject().toString()))
                 stringBuilder.insert(stringBuilder.indexOf("WHERE"), e.getTriple().getSubject().toString() + " ");
@@ -155,12 +211,12 @@ public class QueryLearner {
 
     private boolean joinSets(Set<List<String>> valuation, List<Set<String>> disjointSets) {
         boolean areThereDisjointElements = false;
-        for (List<String> row : valuation){
-            for (String value: row) {
+        for (List<String> row : valuation) {
+            for (String value : row) {
                 Set<String> setToJoinElements = new HashSet<>();
                 for (int i = 0; i < disjointSets.size(); i++) {
                     Set<String> elementsInDisjointSet = disjointSets.get(i);
-                    if (elementsInDisjointSet.contains(value)){
+                    if (elementsInDisjointSet.contains(value)) {
                         setToJoinElements.addAll(elementsInDisjointSet);
                         disjointSets.remove(i--);
                         areThereDisjointElements = true;
@@ -180,18 +236,20 @@ public class QueryLearner {
 
     /**
      * @param candidateTriples A set of common candidate triples for each component of the examples.
-     * @param parsedExamples       the set of parsed examples.
+     * @param parsedExamples   the set of parsed examples.
      */
-    private Set<Hyperedge> constructHyperedges(Set<ExampleEntry<String, Triple>> candidateTriples, Set<Example> parsedExamples) throws IOException {
+    private Set<Hyperedge> constructHyperedges(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples, Set<Example> parsedExamples) throws IOException {
         Set<Hyperedge> hyperedges = new HashSet<>();
         Map<Boolean, List<Example>> categorizedExamples = parsedExamples.stream().collect(Collectors.groupingBy(Example::getCategory));
         List<Example> positiveExamples = categorizedExamples.get(Example.CATEGORY_POSITIVE);
 
         for (Example c : positiveExamples) {
 
-            Set<ExampleEntry<String, Triple>> componentCandidateTriples = candidateTriples.stream().filter(example -> example.getKey().equals(c.getExample())).collect(Collectors.toSet());
+            Set<ExampleEntry<String, Triple>> componentCandidateTriples = candidateTriples.get(c);
 
             Map<String, List<Triple>> triplesBySelectedVariable = new HashMap<>();
+
+            // FIXME: The NullPointerException because of componentCandidateTriples is null
             int selectedVariablesAmount = introduceVariables(componentCandidateTriples, parsedExamples, triplesBySelectedVariable);
 
             Set<List<String>> completeQueryValuation = utilsJena.runCompleteQueryForHyperedges(componentCandidateTriples, parsedExamples, selectedVariablesAmount);

@@ -89,7 +89,7 @@ public class UtilsJena {
     public Set<List<String>> runCompleteQueryForHyperedges(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Set<Example> parsedExamples, int selectedVariablesAmount){
         StringBuilder stringBuilder = new StringBuilder();
 
-        stringBuilder.append("SELECT ");
+        stringBuilder.append("SELECT DISTINCT ");
         for (int i = 0; i < selectedVariablesAmount; i++)
             stringBuilder.append("?" + SELECTED_VARIABLE_PATTERN + i + ", ");
         stringBuilder.deleteCharAt(stringBuilder.lastIndexOf(","));
@@ -139,7 +139,7 @@ public class UtilsJena {
     public Set<List<String>> runPartialQueryForHyperedges(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Set<Example> parsedExamples, ExampleEntry<String, Triple> cct, int selectedVariablesAmount) {
         StringBuilder stringBuilder = new StringBuilder();
 
-        stringBuilder.append("SELECT ");
+        stringBuilder.append("SELECT DISTINCT ");
         for (int i = 0; i < selectedVariablesAmount; i++)
             stringBuilder.append("?" + SELECTED_VARIABLE_PATTERN + i + ", ");
         stringBuilder.deleteCharAt(stringBuilder.lastIndexOf(","));

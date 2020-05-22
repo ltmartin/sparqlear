@@ -62,4 +62,9 @@ public class Example implements Comparable<Example> {
         else
             return this.getPosition().compareTo(o.getPosition());
     }
+
+    @Override
+    public String toString() {
+        return example;
+    }
 }
