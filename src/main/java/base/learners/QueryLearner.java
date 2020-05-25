@@ -271,10 +271,9 @@ public class QueryLearner {
 
             double totalInformationGain = computeInformationGain(completeQueryValuation, categorizedExamples);
 
-            // FIXME: Make this parallel
-            componentCandidateTriples.stream().forEach(cct -> {
+            componentCandidateTriples.parallelStream().forEach(cct -> {
                 Set<List<String>> partialQueryValuation = utilsJena.runPartialQueryForHyperedges(componentCandidateTriples, parsedExamples, cct, selectedVariablesAmount);
-                double cctInformationGain = totalInformationGain - computeInformationGain(partialQueryValuation, categorizedExamples);
+                double cctInformationGain = computeInformationGain(partialQueryValuation, categorizedExamples) - totalInformationGain;
                 hyperedges.add(new Hyperedge(cct.getValue(), cctInformationGain));
             });
         }
@@ -416,15 +415,21 @@ public class QueryLearner {
         int negativeExamplesFoundCounter = 0;
         for (List<String> row : queryValuation) {
             boolean found = false;
-            for (int i = 0; i < positiveExamplesByGroup.size() && !found; i++) {
-                List<Example> ithGroup = positiveExamplesByGroup.get(i);
+            Set<Integer> positiveExamplesKeys = positiveExamplesByGroup.keySet();
+            for (Integer positiveExampleKey : positiveExamplesKeys) {
+                if (found) break;
+                List<Example> ithGroup = positiveExamplesByGroup.get(positiveExampleKey);
                 List<String> ithGroupAsList = exampleUtils.getExamplesAsListOfString(ithGroup);
                 found = (row.size() == ithGroupAsList.size()) && ((!ithGroupAsList.containsAll(row)) ? false : row.containsAll(ithGroupAsList));
                 if (found)
                     positiveExamplesFoundCounter++;
             }
-            for (int i = 0; i < negativeExamplesByGroup.size() && !found; i++) {
-                List<Example> ithGroup = negativeExamplesByGroup.get(i);
+
+            Set<Integer> negativeExamplesKeys = negativeExamplesByGroup.keySet();
+            for (Integer negativeExampleKey : negativeExamplesKeys) {
+                if (found) break;
+
+                List<Example> ithGroup = negativeExamplesByGroup.get(negativeExampleKey);
                 List<String> ithGroupAsList = exampleUtils.getExamplesAsListOfString(ithGroup);
                 found = (row.size() == ithGroupAsList.size()) && ((!ithGroupAsList.containsAll(row)) ? false : row.containsAll(ithGroupAsList));
                 if (found)
