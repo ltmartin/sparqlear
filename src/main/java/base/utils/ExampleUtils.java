@@ -15,12 +15,12 @@ public class ExampleUtils {
         Set<Example> parsedExamples = new HashSet<>();
         if (checkStructure(examples)){
             boolean groupedExamples = examples.contains("<");
-            Set<String> splittedStringExamples = new HashSet<>();
-            splittedStringExamples.addAll(Arrays.asList(examples.split("\\s(?=\\+|-)")));
+            Set<String> splittedStringExamples = new LinkedHashSet<>();
+            Collections.addAll(splittedStringExamples, examples.split("\\s(?=\\+|-)"));
 
             int groupId = 0;
-            if (!groupedExamples){
-                for (String e : splittedStringExamples){
+            if (!groupedExamples) {
+                for (String e : splittedStringExamples) {
                     boolean positive = e.charAt(0) == '+';
                     if (positive)
                         parsedExamples.add(new Example(groupId++, e.substring(1), Example.CATEGORY_POSITIVE, 0));

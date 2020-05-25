@@ -104,7 +104,7 @@ public class UtilsJena {
         return runQuery(query);
     }
 
-    private String getSparqlCompatibleTriple(Triple value) {
+    public String getSparqlCompatibleTriple(Triple value) {
         String subject = value.getSubject().toString();
         String predicate = value.getPredicate().toString();
         String object = value.getObject().toString();
@@ -174,9 +174,13 @@ public class UtilsJena {
                 }
                 results.add(rowValues);
             }
-        } catch (QueryParseException e){
+        } catch (QueryParseException e) {
             System.out.println("===============================================");
             logger.log(Level.SEVERE, "Error processing the query: \n" + query + "\n");
+            System.out.println("===============================================");
+        } catch (Exception e) {
+            System.out.println("===============================================");
+            logger.log(Level.SEVERE, "It has occurred an external error processing the query: \n" + query + "\n");
             System.out.println("===============================================");
         }
 

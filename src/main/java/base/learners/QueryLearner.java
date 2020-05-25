@@ -41,6 +41,8 @@ public class QueryLearner {
     private String endpoint;
     @Value("${sparqlear.sparql.candidateTriples.limit}")
     private int limit;
+    @Value("${sparqlear.sparql.results.limit}")
+    private String resultsLimit;
     @Value("${sparqlear.sparql.datasets}")
     private String datasets;
     @Value("${sparqlear.verifyPredicatesRank}")
@@ -84,7 +86,7 @@ public class QueryLearner {
 
         if (null == parsedDatasets) {
             candidateTriples = filterCommonTriples(candidateTriples, positiveExamplesByComponent);
-            Set<Hyperedge> hyperedges = constructHyperedges(candidateTriples, parsedExamples);
+            Set<Hyperedge> hyperedges = constructHyperedges(candidateTriples, parsedExamples, positiveExamplesByComponent);
             String query = buildQuery(positiveExamples, hyperedges);
             derivedQueries.add(query);
         } else {
@@ -112,6 +114,7 @@ public class QueryLearner {
                 });
             }
 
+            // this is the first example on each component
             Example example = examples.get(0);
 
             Set<ExampleEntry<String, Triple>> exampleCandidateTriples = componentCandidateTriples.get(example);
@@ -171,7 +174,6 @@ public class QueryLearner {
      * @return a query joining the most of the examples.
      */
     private String buildQuery(Set<Example> positiveExamples, Set<Hyperedge> hyperedges) {
-        String query = "";
         // Make disjoint sets
         List<Set<String>> disjointSets = new LinkedList<>();
         for (Example e : positiveExamples) {
@@ -185,7 +187,7 @@ public class QueryLearner {
                 .collect(Collectors.toCollection(LinkedHashSet::new));
 
         StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append("SELECT WHERE {}");
+        stringBuilder.append("SELECT DISTINCT WHERE {} LIMIT " + resultsLimit);
         for (Hyperedge e : hyperedges) {
 
             if (e.getTriple().getSubject().toString().startsWith(NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN).toString()) && !stringBuilder.toString().contains(e.getTriple().getSubject().toString()))
@@ -195,25 +197,23 @@ public class QueryLearner {
             if (e.getTriple().getObject().toString().startsWith(NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN).toString()) && !stringBuilder.toString().contains(e.getTriple().getObject().toString()))
                 stringBuilder.insert(stringBuilder.indexOf("WHERE"), e.getTriple().getObject().toString() + " ");
 
-            stringBuilder.insert(stringBuilder.indexOf("}"), e.getTriple().toString() + ". ");
+            stringBuilder.insert(stringBuilder.indexOf("}"), utilsJena.getSparqlCompatibleTriple(e.getTriple()) + ". ");
             String candidateQuery = stringBuilder.toString();
             Set<List<String>> valuation = utilsJena.runQuery(candidateQuery);
 
             boolean areThereDisjointElements = joinSets(valuation, disjointSets);
-            if (areThereDisjointElements)
-                query = candidateQuery;
-            if (disjointSets.size() == 1)
-                break;
-        }
+            if (!areThereDisjointElements)
+                return candidateQuery;
 
-        return query;
+        }
+        return null;
     }
 
     private boolean joinSets(Set<List<String>> valuation, List<Set<String>> disjointSets) {
         boolean areThereDisjointElements = false;
+        Set<String> setToJoinElements = new HashSet<>();
         for (List<String> row : valuation) {
             for (String value : row) {
-                Set<String> setToJoinElements = new HashSet<>();
                 for (int i = 0; i < disjointSets.size(); i++) {
                     Set<String> elementsInDisjointSet = disjointSets.get(i);
                     if (elementsInDisjointSet.contains(value)) {
@@ -223,14 +223,12 @@ public class QueryLearner {
                         break;
                     }
                 }
-                if (areThereDisjointElements)
-                    disjointSets.add(setToJoinElements);
-                if (disjointSets.size() == 1)
-                    return areThereDisjointElements;
             }
         }
+        if (areThereDisjointElements)
+            disjointSets.add(setToJoinElements);
 
-        return areThereDisjointElements;
+        return disjointSets.size() > 1;
     }
 
 
@@ -238,18 +236,20 @@ public class QueryLearner {
      * @param candidateTriples A set of common candidate triples for each component of the examples.
      * @param parsedExamples   the set of parsed examples.
      */
-    private Set<Hyperedge> constructHyperedges(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples, Set<Example> parsedExamples) throws IOException {
+    private Set<Hyperedge> constructHyperedges(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples, Set<Example> parsedExamples, Map<Integer, List<Example>> positiveExamplesByComponent) throws IOException {
         Set<Hyperedge> hyperedges = new HashSet<>();
         Map<Boolean, List<Example>> categorizedExamples = parsedExamples.stream().collect(Collectors.groupingBy(Example::getCategory));
         List<Example> positiveExamples = categorizedExamples.get(Example.CATEGORY_POSITIVE);
 
-        for (Example c : positiveExamples) {
+        Set<Integer> positiveExamplesByComponentKeySet = positiveExamplesByComponent.keySet();
+        for (Integer positiveExamplesByComponentKey : positiveExamplesByComponentKeySet) {
+            // construct the hyperedge that joins all the examples of the component from the triples of the first example.
+            Example c = positiveExamplesByComponent.get(positiveExamplesByComponentKey).get(0);
 
             Set<ExampleEntry<String, Triple>> componentCandidateTriples = candidateTriples.get(c);
 
             Map<String, List<Triple>> triplesBySelectedVariable = new HashMap<>();
 
-            // FIXME: The NullPointerException because of componentCandidateTriples is null
             int selectedVariablesAmount = introduceVariables(componentCandidateTriples, parsedExamples, triplesBySelectedVariable);
 
             Set<List<String>> completeQueryValuation = utilsJena.runCompleteQueryForHyperedges(componentCandidateTriples, parsedExamples, selectedVariablesAmount);

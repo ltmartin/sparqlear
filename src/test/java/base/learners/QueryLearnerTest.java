@@ -24,11 +24,32 @@ class QueryLearnerTest {
 
 
     @Test
-    void learn() {
+    void allPositiveSingleVariableExamples() {
         String examples = "+Cuba +Venezuela +Colombia";
         try {
             Set<String> learnedQueries = queryLearner.learn(examples);
+            System.out.println("===================================================");
+            System.out.println("Result: ");
             learnedQueries.stream().forEach(query -> System.out.println(query));
+            System.out.println("===================================================");
+        } catch (ParseException e) {
+            e.printStackTrace();
+        } catch (ExampleException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
+    void positiveAndNegativeSingleVariableExamples() {
+        String examples = "+Cuba +Venezuela +Colombia -Gris -Pan";
+        try {
+            Set<String> learnedQueries = queryLearner.learn(examples);
+            System.out.println("===================================================");
+            System.out.println("Result: ");
+            learnedQueries.stream().forEach(query -> System.out.println(query));
+            System.out.println("===================================================");
         } catch (ParseException e) {
             e.printStackTrace();
         } catch (ExampleException e) {
