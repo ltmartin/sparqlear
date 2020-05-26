@@ -85,9 +85,15 @@ public class QueryLearner {
         logger.log(Level.INFO, "Candidate triples successfully derived.");
 
         if (null == parsedDatasets) {
+            logger.log(Level.INFO, "Filtering common triples....");
             candidateTriples = filterCommonTriples(candidateTriples, positiveExamplesByComponent);
+            logger.log(Level.INFO, "Common triples filtered.");
+            logger.log(Level.INFO, "Constructing hyperedges....");
             Set<Hyperedge> hyperedges = constructHyperedges(candidateTriples, parsedExamples, positiveExamplesByComponent);
+            logger.log(Level.INFO, "Hyperedges constructed.");
+            logger.log(Level.INFO, "Building query....");
             String query = buildQuery(positiveExamples, hyperedges);
+            logger.log(Level.INFO, "Query built.");
             derivedQueries.add(query);
         } else {
             // TODO: Create the flow for learning from multiple datasets.
@@ -239,7 +245,6 @@ public class QueryLearner {
     private Set<Hyperedge> constructHyperedges(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples, Set<Example> parsedExamples, Map<Integer, List<Example>> positiveExamplesByComponent) throws IOException {
         Set<Hyperedge> hyperedges = new HashSet<>();
         Map<Boolean, List<Example>> categorizedExamples = parsedExamples.stream().collect(Collectors.groupingBy(Example::getCategory));
-        List<Example> positiveExamples = categorizedExamples.get(Example.CATEGORY_POSITIVE);
 
         Set<Integer> positiveExamplesByComponentKeySet = positiveExamplesByComponent.keySet();
         for (Integer positiveExamplesByComponentKey : positiveExamplesByComponentKeySet) {

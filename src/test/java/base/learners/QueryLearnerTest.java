@@ -58,4 +58,22 @@ class QueryLearnerTest {
             e.printStackTrace();
         }
     }
+
+    @Test
+    void positiveMultipleVariableExamples() {
+        String examples = "+<Jose, Cuba, Writer> +<Rubens, Belgium, Painter>";
+        try {
+            Set<String> learnedQueries = queryLearner.learn(examples);
+            System.out.println("===================================================");
+            System.out.println("Result: ");
+            learnedQueries.stream().forEach(query -> System.out.println(query));
+            System.out.println("===================================================");
+        } catch (ParseException e) {
+            e.printStackTrace();
+        } catch (ExampleException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }

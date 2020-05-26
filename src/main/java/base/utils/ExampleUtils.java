@@ -32,7 +32,8 @@ public class ExampleUtils {
                     boolean positive = e.charAt(0) == '+';
                     String aux = e.substring(2, e.length() - 1);
 
-                    Set<String> variables = Set.of(aux.split(",\\s{1}"));
+                    Set<String> variables = new LinkedHashSet<>();
+                    Collections.addAll(variables, aux.split(",\\s{1}"));
                     int position = 0;
                     for (String v : variables)
                         if (positive)
