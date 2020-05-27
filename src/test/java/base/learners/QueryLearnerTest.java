@@ -1,7 +1,6 @@
 package base.learners;
 
 import base.Application;
-import base.exceptions.ExampleException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,6 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 import java.io.IOException;
 import java.text.ParseException;
+import java.util.Optional;
 import java.util.Set;
 
 @SpringBootTest(classes = Application.class)
@@ -27,14 +27,15 @@ class QueryLearnerTest {
     void allPositiveSingleVariableExamples() {
         String examples = "+Cuba +Venezuela +Colombia";
         try {
-            Set<String> learnedQueries = queryLearner.learn(examples);
+            Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");
             System.out.println("Result: ");
-            learnedQueries.stream().forEach(query -> System.out.println(query));
+            if (!learnedQueries.isPresent())
+                System.out.println("Nothing learned.");
+            else
+                learnedQueries.stream().forEach(query -> System.out.println(query));
             System.out.println("===================================================");
         } catch (ParseException e) {
-            e.printStackTrace();
-        } catch (ExampleException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
@@ -43,16 +44,17 @@ class QueryLearnerTest {
 
     @Test
     void positiveAndNegativeSingleVariableExamples() {
-        String examples = "+Cuba +Venezuela +Colombia -Gris -Pan";
+        String examples = "+Cuba +Venezuela +Colombia -Gris -Pan -Love";
         try {
-            Set<String> learnedQueries = queryLearner.learn(examples);
+            Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");
             System.out.println("Result: ");
-            learnedQueries.stream().forEach(query -> System.out.println(query));
+            if (!learnedQueries.isPresent())
+                System.out.println("Nothing learned");
+            else
+                learnedQueries.stream().forEach(query -> System.out.println(query));
             System.out.println("===================================================");
         } catch (ParseException e) {
-            e.printStackTrace();
-        } catch (ExampleException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
@@ -61,16 +63,18 @@ class QueryLearnerTest {
 
     @Test
     void positiveMultipleVariableExamples() {
-        String examples = "+<Jose, Cuba, Writer> +<Rubens, Belgium, Painter>";
+        String examples = "+<José, Cuba, Writer> +<Leonardo, Italy, Painter>";
         try {
-            Set<String> learnedQueries = queryLearner.learn(examples);
+            Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");
             System.out.println("Result: ");
-            learnedQueries.stream().forEach(query -> System.out.println(query));
+            if (!learnedQueries.isPresent())
+                System.out.println("Nothing learned.");
+            else
+                learnedQueries.stream().forEach(query -> System.out.println(query));
+
             System.out.println("===================================================");
         } catch (ParseException e) {
-            e.printStackTrace();
-        } catch (ExampleException e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();

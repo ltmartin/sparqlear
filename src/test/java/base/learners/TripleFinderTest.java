@@ -24,7 +24,7 @@ class TripleFinderTest {
     public void deriveCandidateTriplesTest(){
         try {
             long initTime = System.nanoTime();
-            Set<ExampleEntry<String, Triple>> candidateTriples =  tripleFinder.deriveCandidateTriples(example, Optional.empty());
+            Set<ExampleEntry<String, Triple>> candidateTriples = tripleFinder.deriveCandidateTriples(example, Optional.empty(), 0);
             long endTime = System.nanoTime();
 
             long elapsedTimeMinutes = ((endTime - initTime)/1000000)/60000;

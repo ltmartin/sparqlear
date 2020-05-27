@@ -36,12 +36,12 @@ public class UtilsJena {
     /**
      * Method to derive the triples directly related with a example.
      *
-     * @param example   The example to derive the triples where it appears.
-     * @param dataset   (Optional) In the case that the SPARQL endpoint host more that one dataset, it is possible to specify over which dataset the query must run.
-     * @param limit Specifies a limit of triples to be retrieved according to the role perfomed by the example (subject, predicate or object).
+     * @param example The example to derive the triples where it appears.
+     * @param dataset (Optional) In the case that the SPARQL endpoint host more that one dataset, it is possible to specify over which dataset the query must run.
+     * @param limit   Specifies a limit of triples to be retrieved according to the role perfomed by the example (subject, predicate or object).
      * @return Set<Triple> containing the derived triples.
      */
-    public Set deriveTriples(String example, Optional<String> dataset, int limit) throws IOException {
+    public Set deriveTriples(String example, Optional<String> dataset, int limit, int offset) throws IOException {
         if (!UrlValidator.getInstance().isValid(endpoint))
             throw new IOException("Invalid endpoint");
 
@@ -51,21 +51,21 @@ public class UtilsJena {
         String exampleSubject = null, examplePredicate = null, exampleObject = null;
 
         if (dataset.isPresent()) {
-            exampleSubject = "SELECT ?p ?o FROM " + dataset.get() + " WHERE {" + example + " ?p ?o .} LIMIT " + limit;
+            exampleSubject = "SELECT ?p ?o FROM " + dataset.get() + " WHERE {" + example + " ?p ?o .} LIMIT " + limit + " OFFSET " + offset;
 
             // Only URIs are valid predicates according to the SPARQL specification.
             if (UrlValidator.getInstance().isValid(example))
-                examplePredicate = "SELECT ?s ?o FROM " + dataset.get() + " WHERE { ?s " + example + " ?o .} LIMIT " + limit;
+                examplePredicate = "SELECT ?s ?o FROM " + dataset.get() + " WHERE { ?s " + example + " ?o .} LIMIT " + limit + " OFFSET " + offset;
 
-            exampleObject = "SELECT ?s ?p FROM " + dataset.get() + " WHERE { ?s ?p " + example + " .} LIMIT " + limit;
+            exampleObject = "SELECT ?s ?p FROM " + dataset.get() + " WHERE { ?s ?p " + example + " .} LIMIT " + limit + " OFFSET " + offset;
         } else {
-            exampleSubject = "SELECT ?p ?o WHERE {" + example + " ?p ?o .} LIMIT " + limit;
+            exampleSubject = "SELECT ?p ?o WHERE {" + example + " ?p ?o .} LIMIT " + limit + " OFFSET " + offset;
 
             // Only URIs are valid predicates according to the SPARQL specification.
             if (UrlValidator.getInstance().isValid(UtilsJena.getCanonicalExample(example)))
-                examplePredicate = "SELECT ?s ?o WHERE { ?s " + example + " ?o .} LIMIT " + limit;
+                examplePredicate = "SELECT ?s ?o WHERE { ?s " + example + " ?o .} LIMIT " + limit + " OFFSET " + offset;
 
-            exampleObject = "SELECT ?s ?p WHERE { ?s ?p " + example + " .} LIMIT " + limit;
+            exampleObject = "SELECT ?s ?p WHERE { ?s ?p " + example + " .} LIMIT " + limit + " OFFSET " + offset;
         }
 
         DeriveTriplesQueryExecutor executorTask = new DeriveTriplesQueryExecutor(endpoint, exampleSubject, examplePredicate, exampleObject, example, DeriveTriplesQueryExecutor.NONE_SELECTOR);

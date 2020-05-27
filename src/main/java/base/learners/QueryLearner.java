@@ -3,7 +3,6 @@ package base.learners;
 import base.domain.Example;
 import base.domain.ExampleEntry;
 import base.domain.Hyperedge;
-import base.exceptions.ExampleException;
 import base.services.PropertiesService;
 import base.utils.DatasetsParser;
 import base.utils.ExampleUtils;
@@ -52,7 +51,10 @@ public class QueryLearner {
     @Value("${sparqlear.learnMultipleQueries}")
     private Boolean learnMultipleQueries;
 
-    public Set<String> learn(String examples) throws ParseException, ExampleException, IOException {
+    private int selectedVariablesAmount;
+    private Map<String, List<Triple>> triplesBySelectedVariable = new HashMap<>();
+
+    public Optional<Set<String>> learn(String examples) throws ParseException, IOException {
         Set<String> derivedQueries = new HashSet<>();
         Set<String> parsedDatasets = null;
 
@@ -71,6 +73,41 @@ public class QueryLearner {
 
         Set<Example> positiveExamples = new HashSet<>(categorizedExamples.get(Example.CATEGORY_POSITIVE));
         Map<Integer, List<Example>> positiveExamplesByComponent = positiveExamples.stream().collect(Collectors.groupingBy(Example::getPosition));
+        Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples = deriveCandidateTriples(positiveExamplesByComponent, Optional.empty(), 0);
+
+        if (null == parsedDatasets) {
+            int i = 1;
+            do {
+                logger.log(Level.INFO, "Filtering common triples....");
+                candidateTriples = filterCommonTriples(candidateTriples, positiveExamplesByComponent);
+                logger.log(Level.INFO, "Common triples filtered.");
+                Set<Example> candidateTriplesKeySet = candidateTriples.keySet();
+                for (Example example : candidateTriplesKeySet) {
+                    selectedVariablesAmount += introduceVariables(candidateTriples.get(example), parsedExamples, triplesBySelectedVariable);
+                }
+                if (selectedVariablesAmount < 1) {
+                    candidateTriples = deriveCandidateTriples(positiveExamplesByComponent, Optional.empty(), i * limit);
+                    i++;
+                }
+            } while ((selectedVariablesAmount < 1) || null == candidateTriples || candidateTriples.isEmpty());
+
+            if (null == candidateTriples || candidateTriples.isEmpty())
+                return Optional.empty();
+
+            logger.log(Level.INFO, "Constructing hyperedges....");
+            Set<Hyperedge> hyperedges = constructHyperedges(candidateTriples, parsedExamples, positiveExamplesByComponent);
+            logger.log(Level.INFO, "Hyperedges constructed.");
+            logger.log(Level.INFO, "Building query....");
+            String query = buildQuery(positiveExamples, hyperedges, categorizedExamples);
+            logger.log(Level.INFO, "Query built.");
+            derivedQueries.add(query);
+        } else {
+            // TODO: Create the flow for learning from multiple datasets.
+        }
+        return Optional.of(derivedQueries);
+    }
+
+    private Map<Example, Set<ExampleEntry<String, Triple>>> deriveCandidateTriples(Map<Integer, List<Example>> positiveExamplesByComponent, Optional<String> dataset, int offset) throws IOException {
         Set<Integer> componentKeys = positiveExamplesByComponent.keySet();
 
         Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples = new HashMap<>();
@@ -78,29 +115,15 @@ public class QueryLearner {
         for (Integer componentKey : componentKeys) {
             List<Example> componentExamples = positiveExamplesByComponent.get(componentKey);
             for (Example componentExample : componentExamples) {
-                candidateTriples.put(componentExample, tripleFinder.deriveCandidateTriples(componentExample.getExample(), Optional.empty()));
+                candidateTriples.put(componentExample, tripleFinder.deriveCandidateTriples(componentExample.getExample(), dataset, offset));
+                // this is because there might be examples that are not present on the dataset, so we can't learn anything from them.
+                if (candidateTriples.get(componentExample).isEmpty())
+                    return null;
             }
-
         }
         logger.log(Level.INFO, "Candidate triples successfully derived.");
 
-        if (null == parsedDatasets) {
-            logger.log(Level.INFO, "Filtering common triples....");
-            candidateTriples = filterCommonTriples(candidateTriples, positiveExamplesByComponent);
-            logger.log(Level.INFO, "Common triples filtered.");
-            logger.log(Level.INFO, "Constructing hyperedges....");
-            Set<Hyperedge> hyperedges = constructHyperedges(candidateTriples, parsedExamples, positiveExamplesByComponent);
-            logger.log(Level.INFO, "Hyperedges constructed.");
-            logger.log(Level.INFO, "Building query....");
-            String query = buildQuery(positiveExamples, hyperedges);
-            logger.log(Level.INFO, "Query built.");
-            derivedQueries.add(query);
-        } else {
-            // TODO: Create the flow for learning from multiple datasets.
-        }
-
-
-        return derivedQueries;
+        return candidateTriples;
     }
 
     private Map<Example, Set<ExampleEntry<String, Triple>>> filterCommonTriples(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples, Map<Integer, List<Example>> positiveExamplesByComponent) {
@@ -179,7 +202,7 @@ public class QueryLearner {
      * @param hyperedges       a set of hyperedges.
      * @return a query joining the most of the examples.
      */
-    private String buildQuery(Set<Example> positiveExamples, Set<Hyperedge> hyperedges) {
+    private String buildQuery(Set<Example> positiveExamples, Set<Hyperedge> hyperedges, Map<Boolean, List<Example>> examples) {
         // Make disjoint sets
         List<Set<String>> disjointSets = new LinkedList<>();
         for (Example e : positiveExamples) {
@@ -208,7 +231,8 @@ public class QueryLearner {
             Set<List<String>> valuation = utilsJena.runQuery(candidateQuery);
 
             boolean areThereDisjointElements = joinSets(valuation, disjointSets);
-            if (!areThereDisjointElements)
+            double informationGain = computeInformationGain(valuation, examples);
+            if (!areThereDisjointElements && (informationGain >= informationGainThreshold))
                 return candidateQuery;
 
         }
@@ -253,10 +277,6 @@ public class QueryLearner {
 
             Set<ExampleEntry<String, Triple>> componentCandidateTriples = candidateTriples.get(c);
 
-            Map<String, List<Triple>> triplesBySelectedVariable = new HashMap<>();
-
-            int selectedVariablesAmount = introduceVariables(componentCandidateTriples, parsedExamples, triplesBySelectedVariable);
-
             Set<List<String>> completeQueryValuation = utilsJena.runCompleteQueryForHyperedges(componentCandidateTriples, parsedExamples, selectedVariablesAmount);
 
             // Piece of code to protect those triples that are the only ones extracting a selected variable.
@@ -276,7 +296,7 @@ public class QueryLearner {
 
             double totalInformationGain = computeInformationGain(completeQueryValuation, categorizedExamples);
 
-            componentCandidateTriples.parallelStream().forEach(cct -> {
+            componentCandidateTriples.stream().forEach(cct -> {
                 Set<List<String>> partialQueryValuation = utilsJena.runPartialQueryForHyperedges(componentCandidateTriples, parsedExamples, cct, selectedVariablesAmount);
                 double cctInformationGain = computeInformationGain(partialQueryValuation, categorizedExamples) - totalInformationGain;
                 hyperedges.add(new Hyperedge(cct.getValue(), cctInformationGain));
