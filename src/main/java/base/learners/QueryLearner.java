@@ -298,7 +298,7 @@ public class QueryLearner {
 
             componentCandidateTriples.parallelStream().forEach(cct -> {
                 Set<List<String>> partialQueryValuation = utilsJena.runPartialQueryForHyperedges(componentCandidateTriples, parsedExamples, cct, selectedVariablesAmount);
-                double cctInformationGain = computeInformationGain(partialQueryValuation, categorizedExamples) - totalInformationGain;
+                double cctInformationGain = totalInformationGain - computeInformationGain(partialQueryValuation, categorizedExamples);
                 hyperedges.add(new Hyperedge(cct.getValue(), cctInformationGain));
             });
         }
