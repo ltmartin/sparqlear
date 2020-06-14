@@ -53,6 +53,8 @@ public class QueryLearner {
 
     private int selectedVariablesAmount;
     private Map<String, List<Triple>> triplesBySelectedVariable = new HashMap<>();
+    private Map<String, Node> variableNames = new HashMap<>();
+    private int svIndex = 0, nsvIndex = 0;
 
     public Optional<Set<String>> learn(String examples) throws ParseException, IOException {
         Set<String> derivedQueries = new HashSet<>();
@@ -85,14 +87,15 @@ public class QueryLearner {
                 for (Example example : candidateTriplesKeySet) {
                     selectedVariablesAmount += introduceVariables(candidateTriples.get(example), parsedExamples, triplesBySelectedVariable);
                 }
-                if (selectedVariablesAmount < 1) {
+                if (selectedVariablesAmount < positiveExamplesByComponent.size()) {
                     candidateTriples = deriveCandidateTriples(positiveExamplesByComponent, Optional.empty(), i * limit);
+                    if (null == candidateTriples || candidateTriples.isEmpty())
+                        return Optional.empty();
                     i++;
                 }
-            } while ((selectedVariablesAmount < 1) || null == candidateTriples || candidateTriples.isEmpty());
+            } while (selectedVariablesAmount < positiveExamplesByComponent.size());
 
-            if (null == candidateTriples || candidateTriples.isEmpty())
-                return Optional.empty();
+
 
             logger.log(Level.INFO, "Constructing hyperedges....");
             Set<Hyperedge> hyperedges = constructHyperedges(candidateTriples, parsedExamples, positiveExamplesByComponent);
@@ -128,6 +131,9 @@ public class QueryLearner {
 
     private Map<Example, Set<ExampleEntry<String, Triple>>> filterCommonTriples(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples, Map<Integer, List<Example>> positiveExamplesByComponent) {
         Map<Example, Set<ExampleEntry<String, Triple>>> commonTriples = new HashMap<>();
+
+        if (null == candidateTriples)
+            return commonTriples;
 
         Set<Integer> keys = positiveExamplesByComponent.keySet();
         for (Integer key : keys) {
@@ -313,8 +319,6 @@ public class QueryLearner {
      */
 
     private int introduceVariables(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Set<Example> parsedExamples, Map<String, List<Triple>> triplesBySelectedVariable) {
-        int svIndex = 0, nsvIndex = 0;
-        Map<String, Node> variableNames = new HashMap<>();
         for (ExampleEntry<String, Triple> cct : componentCandidateTriples) {
             boolean isExampleProvidedByUser = parsedExamples.stream().filter(example -> example.getExample().equals(cct.getKey())).count() != 0;
 
