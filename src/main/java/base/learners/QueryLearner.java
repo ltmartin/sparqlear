@@ -76,21 +76,25 @@ public class QueryLearner {
         Set<Example> positiveExamples = new HashSet<>(categorizedExamples.get(Example.CATEGORY_POSITIVE));
         Map<Integer, List<Example>> positiveExamplesByComponent = positiveExamples.stream().collect(Collectors.groupingBy(Example::getPosition));
         Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples = deriveCandidateTriples(positiveExamplesByComponent, Optional.empty(), 0);
+        Map<Example, Set<ExampleEntry<String, Triple>>> commonTriples = new HashMap<>();
 
         if (null == parsedDatasets) {
             int i = 1;
             do {
                 logger.log(Level.INFO, "Filtering common triples....");
-                candidateTriples = filterCommonTriples(candidateTriples, positiveExamplesByComponent);
+                commonTriples = filterCommonTriples(candidateTriples, positiveExamplesByComponent);
                 logger.log(Level.INFO, "Common triples filtered.");
-                Set<Example> candidateTriplesKeySet = candidateTriples.keySet();
-                for (Example example : candidateTriplesKeySet) {
-                    selectedVariablesAmount += introduceVariables(candidateTriples.get(example), parsedExamples, triplesBySelectedVariable);
+                Set<Example> commonTriplesKeySet = commonTriples.keySet();
+                for (Example example : commonTriplesKeySet) {
+                    selectedVariablesAmount += introduceVariables(commonTriples.get(example), parsedExamples, triplesBySelectedVariable);
                 }
                 if (selectedVariablesAmount < positiveExamplesByComponent.size()) {
-                    candidateTriples = deriveCandidateTriples(positiveExamplesByComponent, Optional.empty(), i * limit);
-                    if (null == candidateTriples || candidateTriples.isEmpty())
+                    Map<Example, Set<ExampleEntry<String, Triple>>> moreCandidateTriples = deriveCandidateTriples(positiveExamplesByComponent, Optional.empty(), i * limit);
+
+                    if (null == moreCandidateTriples || moreCandidateTriples.isEmpty())
                         return Optional.empty();
+
+                    candidateTriples.putAll(moreCandidateTriples);
                     i++;
                 }
             } while (selectedVariablesAmount < positiveExamplesByComponent.size());
@@ -98,7 +102,7 @@ public class QueryLearner {
 
 
             logger.log(Level.INFO, "Constructing hyperedges....");
-            Set<Hyperedge> hyperedges = constructHyperedges(candidateTriples, parsedExamples, positiveExamplesByComponent);
+            Set<Hyperedge> hyperedges = constructHyperedges(commonTriples, parsedExamples, positiveExamplesByComponent);
             logger.log(Level.INFO, "Hyperedges constructed.");
             logger.log(Level.INFO, "Building query....");
             String query = buildQuery(positiveExamples, hyperedges, categorizedExamples);

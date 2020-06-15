@@ -63,7 +63,7 @@ class QueryLearnerTest {
 
     @Test
     void positiveMultipleVariableExamples() {
-        String examples = "+<Jose, Cuba, Writer> +<Leonardo, Italy, Painter>";
+        String examples = "+<Fidel, Cuba, male> +<Leonardo, Italy, male>";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");
