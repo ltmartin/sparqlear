@@ -287,7 +287,7 @@ public class QueryLearner {
 
             Set<ExampleEntry<String, Triple>> componentCandidateTriples = candidateTriples.get(c);
 
-            Set<List<String>> completeQueryValuation = utilsJena.runCompleteQueryForHyperedges(componentCandidateTriples, parsedExamples, selectedVariablesAmount);
+            Map<Boolean, Integer> completeQueryCoverage = utilsJena.verifyCompleteQueryForHyperedges(componentCandidateTriples, categorizedExamples, positiveExamplesByComponentKey);
 
             // Piece of code to protect those triples that are the only ones extracting a selected variable.
             for (String key : triplesBySelectedVariable.keySet()) {
@@ -304,11 +304,13 @@ public class QueryLearner {
                 }
             }
 
-            double totalInformationGain = computeInformationGain(completeQueryValuation, categorizedExamples);
+            double totalInformationGain = computeInformationGain(completeQueryCoverage.get(Example.CATEGORY_POSITIVE), completeQueryCoverage.get(Example.CATEGORY_NEGATIVE));
 
             componentCandidateTriples.parallelStream().forEach(cct -> {
-                Set<List<String>> partialQueryValuation = utilsJena.runPartialQueryForHyperedges(componentCandidateTriples, parsedExamples, cct, selectedVariablesAmount);
-                double cctInformationGain = totalInformationGain - computeInformationGain(partialQueryValuation, categorizedExamples);
+                Set<ExampleEntry<String, Triple>> componentCandidateTriplesWithoutCct = new HashSet<>(componentCandidateTriples);
+                componentCandidateTriplesWithoutCct.remove(cct);
+                Map<Boolean, Integer> partialQueryCoverage = utilsJena.verifyCompleteQueryForHyperedges(componentCandidateTriplesWithoutCct, categorizedExamples, positiveExamplesByComponentKey);
+                double cctInformationGain = totalInformationGain - computeInformationGain(partialQueryCoverage.get(Example.CATEGORY_POSITIVE), partialQueryCoverage.get(Example.CATEGORY_NEGATIVE));
                 hyperedges.add(new Hyperedge(cct.getValue(), cctInformationGain));
             });
         }
@@ -436,6 +438,10 @@ public class QueryLearner {
             }
         }
         return svIndex;
+    }
+
+    private double computeInformationGain(Integer positiveExamplesCovered, Integer negativeExamplesCovered) {
+        return Math.log(((double) positiveExamplesCovered) / (positiveExamplesCovered + negativeExamplesCovered));
     }
 
     private double computeInformationGain(Set<List<String>> queryValuation, Map<Boolean, List<Example>> examples) {

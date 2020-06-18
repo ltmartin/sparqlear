@@ -3,6 +3,8 @@ package base.utils;
 import base.domain.Example;
 import base.domain.ExampleEntry;
 import org.apache.commons.validator.routines.UrlValidator;
+import org.apache.jena.graph.Node;
+import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
 import org.apache.jena.query.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +17,7 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 /**
  * @author Leandro Tabares Martín
@@ -28,8 +31,6 @@ public class UtilsJena {
 
     @Value("${sparqlear.sparql.endpoint}")
     private String endpoint;
-    @Value("${sparqlear.sparql.results.limit}")
-    private String resultsLimit;
     @Value("${sparqlear.sparql.timeout}")
     private Integer timeout;
 
@@ -76,32 +77,71 @@ public class UtilsJena {
     public static String getCanonicalExample(String example){
         example = example.replaceAll("<","");
         example = example.replaceAll(">","");
-        example = example.replaceAll("'","");
-        example = example.replaceAll("\"","");
+        example = example.replaceAll("'", "");
+        example = example.replaceAll("\"", "");
 
         return example;
     }
 
-    public static String getSparqlCompatibleExample(String example){
+    public static String getSparqlCompatibleExample(String example) {
         return UrlValidator.getInstance().isValid(example) ? "<" + example + ">" : "'" + example + "'";
     }
 
-    public Set<List<String>> runCompleteQueryForHyperedges(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Set<Example> parsedExamples, int selectedVariablesAmount){
+    public Map<Boolean, Integer> verifyCompleteQueryForHyperedges(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Map<Boolean, List<Example>> categorizedExamples, Integer componentIndex) {
+        Map<Boolean, Integer> results = new HashMap<>();
+        results.put(Example.CATEGORY_POSITIVE, 0);
+        results.put(Example.CATEGORY_NEGATIVE, 0);
+
+        if (null != categorizedExamples.get(Example.CATEGORY_POSITIVE)) {
+            List<Example> positiveExamplesInTheComponent = categorizedExamples.get(Example.CATEGORY_POSITIVE).stream()
+                    .filter(example -> example.getPosition().equals(componentIndex))
+                    .collect(Collectors.toList());
+            for (Example example : positiveExamplesInTheComponent) {
+                String query = constructAskQuery(componentCandidateTriples, example);
+                if (runAskQuery(query)) {
+                    Integer value = results.get(Example.CATEGORY_POSITIVE);
+                    results.replace(Example.CATEGORY_POSITIVE, ++value);
+                }
+            }
+        }
+
+        if (null != categorizedExamples.get(Example.CATEGORY_NEGATIVE)) {
+            List<Example> negativeExamplesInTheComponent = categorizedExamples.get(Example.CATEGORY_NEGATIVE).stream()
+                    .filter(example -> example.getPosition().equals(componentIndex))
+                    .collect(Collectors.toList());
+            for (Example example : negativeExamplesInTheComponent) {
+                String query = constructAskQuery(componentCandidateTriples, example);
+                if (runAskQuery(query)) {
+                    Integer value = results.get(Example.CATEGORY_NEGATIVE);
+                    results.replace(Example.CATEGORY_NEGATIVE, ++value);
+                }
+            }
+        }
+
+        return results;
+    }
+
+    private String constructAskQuery(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Example example) {
         StringBuilder stringBuilder = new StringBuilder();
 
-        stringBuilder.append("SELECT DISTINCT ");
-        for (int i = 0; i < selectedVariablesAmount; i++)
-            stringBuilder.append("?" + SELECTED_VARIABLE_PATTERN + i + ", ");
-        stringBuilder.deleteCharAt(stringBuilder.lastIndexOf(","));
+        stringBuilder.append("ASK ");
         stringBuilder.append("WHERE { ");
-        for (ExampleEntry<String, Triple> cct: componentCandidateTriples)
-            stringBuilder.append(getSparqlCompatibleTriple(cct.getValue()) + ". ");
-        stringBuilder.append("} LIMIT ");
-        stringBuilder.append(resultsLimit);
+        for (ExampleEntry<String, Triple> cct : componentCandidateTriples) {
+            Triple triple = cct.getValue();
 
-        String query = stringBuilder.toString();
+            if (triple.getSubject().toString().contains(SELECTED_VARIABLE_PATTERN)) {
+                Node newSubject = NodeFactory.createLiteral(example.getExample());
+                triple = new Triple(newSubject, triple.getPredicate(), triple.getObject());
+            } else if (triple.getObject().toString().contains(SELECTED_VARIABLE_PATTERN)) {
+                Node newObject = NodeFactory.createLiteral(example.getExample());
+                triple = new Triple(triple.getSubject(), triple.getPredicate(), newObject);
+            }
 
-        return runQuery(query);
+            stringBuilder.append(getSparqlCompatibleTriple(triple) + ". ");
+        }
+        stringBuilder.append("}");
+
+        return stringBuilder.toString();
     }
 
     public String getSparqlCompatibleTriple(Triple value) {
@@ -136,25 +176,10 @@ public class UtilsJena {
     }
 
 
-    public Set<List<String>> runPartialQueryForHyperedges(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Set<Example> parsedExamples, ExampleEntry<String, Triple> cct, int selectedVariablesAmount) {
-        StringBuilder stringBuilder = new StringBuilder();
-
-        stringBuilder.append("SELECT DISTINCT ");
-        for (int i = 0; i < selectedVariablesAmount; i++)
-            stringBuilder.append("?" + SELECTED_VARIABLE_PATTERN + i + ", ");
-        stringBuilder.deleteCharAt(stringBuilder.lastIndexOf(","));
-        stringBuilder.append("WHERE { ");
-        for (ExampleEntry<String, Triple> candidateTriple: componentCandidateTriples) {
-            if (!cct.equals(candidateTriple))
-                stringBuilder.append(getSparqlCompatibleTriple(candidateTriple.getValue()) + ". ");
+    public boolean runAskQuery(String query) {
+        try (QueryExecution qexec = QueryExecutionFactory.sparqlService(endpoint, query)) {
+            return qexec.execAsk();
         }
-        stringBuilder.append("} LIMIT ");
-        stringBuilder.append(resultsLimit);
-
-        String query = stringBuilder.toString();
-
-        return runQuery(query);
-
     }
 
     public Set<List<String>> runQuery(String query) {
