@@ -1,9 +1,10 @@
 package base.learners;
 
+import base.domain.BasicGraphPattern;
 import base.domain.Example;
 import base.domain.ExampleEntry;
-import base.domain.Hyperedge;
 import base.services.PropertiesService;
+import base.utils.CombinationsUtil;
 import base.utils.DatasetsParser;
 import base.utils.ExampleUtils;
 import base.utils.UtilsJena;
@@ -55,13 +56,14 @@ public class QueryLearner {
     private Map<String, List<Triple>> triplesBySelectedVariable = new HashMap<>();
     private Map<String, Node> variableNames = new HashMap<>();
     private int svIndex = 0, nsvIndex = 0;
+    private Set<Example> parsedExamples;
 
     public Optional<Set<String>> learn(String examples) throws ParseException, IOException {
         Set<String> derivedQueries = new HashSet<>();
         Set<String> parsedDatasets = null;
 
         logger.log(Level.INFO, "Parsing examples...");
-        Set<Example> parsedExamples = exampleUtils.parseExamples(examples);
+        parsedExamples = exampleUtils.parseExamples(examples);
         logger.log(Level.INFO, "Examples parsed.");
 
         if (!datasets.isEmpty()) {
@@ -99,19 +101,97 @@ public class QueryLearner {
                 }
             } while (selectedVariablesAmount < positiveExamplesByComponent.size());
 
-
-
-            logger.log(Level.INFO, "Constructing hyperedges....");
-            Set<Hyperedge> hyperedges = constructHyperedges(commonTriples, parsedExamples, positiveExamplesByComponent);
-            logger.log(Level.INFO, "Hyperedges constructed.");
-            logger.log(Level.INFO, "Building query....");
-            String query = buildQuery(positiveExamples, hyperedges, categorizedExamples);
-            logger.log(Level.INFO, "Query built.");
-            derivedQueries.add(query);
+            BasicGraphPattern bgp = constructBasicGraphPattern(commonTriples, categorizedExamples, positiveExamplesByComponent.size());
+            if (null != bgp)
+                derivedQueries.add(buildQuery(bgp));
         } else {
             // TODO: Create the flow for learning from multiple datasets.
         }
         return Optional.of(derivedQueries);
+    }
+
+    private String buildQuery(BasicGraphPattern bgp) {
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("SELECT DISTINCT ");
+
+        Set<String> selectedVariables = new HashSet<>();
+        for (Triple triple : bgp.getTriples()) {
+            if (triple.getSubject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+                selectedVariables.add(triple.getSubject().toString());
+            if (triple.getObject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+                selectedVariables.add(triple.getObject().toString());
+        }
+        List<String> selectedVariablesSorted = new ArrayList<>(selectedVariables);
+        Collections.sort(selectedVariablesSorted);
+        for (String sv : selectedVariablesSorted) {
+            stringBuilder.append(sv + " ");
+        }
+
+        stringBuilder.append("WHERE { ");
+        for (Triple triple : bgp.getTriples()) {
+            stringBuilder.append(utilsJena.getSparqlCompatibleTriple(triple) + " . ");
+        }
+        stringBuilder.append("}");
+
+        return stringBuilder.toString();
+    }
+
+    private BasicGraphPattern constructBasicGraphPattern(Map<Example, Set<ExampleEntry<String, Triple>>> commonTriples, Map<Boolean, List<Example>> categorizedExamples, int numberOfSelectedVariables) {
+        List<ExampleEntry<String, Triple>> allCommonTriples = new LinkedList<>();
+
+        for (Map.Entry<Example, Set<ExampleEntry<String, Triple>>> entry : commonTriples.entrySet()) {
+            allCommonTriples.addAll(entry.getValue());
+        }
+
+        allCommonTriples = allCommonTriples.stream()
+                .sorted((e1, e2) -> {
+                    if (e1.getValue().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN) && !e2.getValue().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+                        return -1;
+                    else if (!e1.getValue().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN) && e2.getValue().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+                        return 1;
+                    else
+                        return 0;
+                })
+                .collect(Collectors.toList());
+
+        List<List<String>> combinationIndexes = CombinationsUtil.generateCombinations(allCommonTriples.size());
+        for (List<String> rowCombinationIndexes : combinationIndexes) {
+            for (String combination : rowCombinationIndexes) {
+                String[] stringIndexes = combination.split(" ");
+                // this is to avoid testing combinations that have a low possibility of being successful
+                if (stringIndexes.length < numberOfSelectedVariables)
+                    continue;
+
+                Set<Node> selectedVariablesIncluded = new HashSet<>();
+
+                List<Integer> indexes = new ArrayList<>();
+                for (int i = 0; i < stringIndexes.length; i++) {
+                    indexes.add(Integer.valueOf(stringIndexes[i]));
+                }
+                BasicGraphPattern bgp = new BasicGraphPattern();
+                for (Integer index : indexes) {
+                    Triple triple = allCommonTriples.get(index).getValue();
+
+                    if (triple.getSubject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+                        selectedVariablesIncluded.add(triple.getSubject());
+                    if (triple.getObject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+                        selectedVariablesIncluded.add(triple.getObject());
+
+                    bgp.getTriples().add(triple);
+                }
+
+                if (selectedVariablesIncluded.size() < numberOfSelectedVariables)
+                    continue;
+
+                Map<Boolean, Integer> results = utilsJena.verifyBasicGraphPattern(bgp.getTriples(), categorizedExamples);
+                if (0 == results.get(Example.CATEGORY_NEGATIVE)) {
+                    bgp.setInformationGain(computeInformationGain(results.get(Example.CATEGORY_POSITIVE)));
+                    if (bgp.getInformationGain() >= informationGainThreshold)
+                        return bgp;
+                }
+            }
+        }
+        return null;
     }
 
     private Map<Example, Set<ExampleEntry<String, Triple>>> deriveCandidateTriples(Map<Integer, List<Example>> positiveExamplesByComponent, Optional<String> dataset, int offset) throws IOException {
@@ -207,116 +287,8 @@ public class QueryLearner {
         return commonTriples;
     }
 
-    /**
-     * @param positiveExamples a set of positive examples.
-     * @param hyperedges       a set of hyperedges.
-     * @return a query joining the most of the examples.
-     */
-    private String buildQuery(Set<Example> positiveExamples, Set<Hyperedge> hyperedges, Map<Boolean, List<Example>> examples) {
-        // Make disjoint sets
-        List<Set<String>> disjointSets = new LinkedList<>();
-        for (Example e : positiveExamples) {
-            Set<String> elements = new HashSet<>();
-            elements.add(e.getExample());
-            disjointSets.add(elements);
-        }
-
-        hyperedges = hyperedges.stream()
-                .sorted((Comparator.comparing(Hyperedge::getInformationGain).reversed()))
-                .collect(Collectors.toCollection(LinkedHashSet::new));
-
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append("SELECT DISTINCT WHERE {} LIMIT " + resultsLimit);
-        for (Hyperedge e : hyperedges) {
-
-            if (e.getTriple().getSubject().toString().startsWith(NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN).toString()) && !stringBuilder.toString().contains(e.getTriple().getSubject().toString()))
-                stringBuilder.insert(stringBuilder.indexOf("WHERE"), e.getTriple().getSubject().toString() + " ");
-            if (e.getTriple().getPredicate().toString().startsWith(NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN).toString()) && !stringBuilder.toString().contains(e.getTriple().getPredicate().toString()))
-                stringBuilder.insert(stringBuilder.indexOf("WHERE"), e.getTriple().getPredicate().toString() + " ");
-            if (e.getTriple().getObject().toString().startsWith(NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN).toString()) && !stringBuilder.toString().contains(e.getTriple().getObject().toString()))
-                stringBuilder.insert(stringBuilder.indexOf("WHERE"), e.getTriple().getObject().toString() + " ");
-
-            stringBuilder.insert(stringBuilder.indexOf("}"), utilsJena.getSparqlCompatibleTriple(e.getTriple()) + ". ");
-            String candidateQuery = stringBuilder.toString();
-            Set<List<String>> valuation = utilsJena.runQuery(candidateQuery);
-
-            boolean areThereDisjointElements = joinSets(valuation, disjointSets);
-            double informationGain = computeInformationGain(valuation, examples);
-            if (!areThereDisjointElements && (informationGain >= informationGainThreshold))
-                return candidateQuery;
-
-        }
-        return null;
-    }
-
-    private boolean joinSets(Set<List<String>> valuation, List<Set<String>> disjointSets) {
-        boolean areThereDisjointElements = false;
-        Set<String> setToJoinElements = new HashSet<>();
-        for (List<String> row : valuation) {
-            for (String value : row) {
-                for (int i = 0; i < disjointSets.size(); i++) {
-                    Set<String> elementsInDisjointSet = disjointSets.get(i);
-                    if (elementsInDisjointSet.contains(value)) {
-                        setToJoinElements.addAll(elementsInDisjointSet);
-                        disjointSets.remove(i--);
-                        areThereDisjointElements = true;
-                        break;
-                    }
-                }
-            }
-        }
-        if (areThereDisjointElements)
-            disjointSets.add(setToJoinElements);
-
-        return disjointSets.size() > 1;
-    }
 
 
-    /**
-     * @param candidateTriples A set of common candidate triples for each component of the examples.
-     * @param parsedExamples   the set of parsed examples.
-     */
-    private Set<Hyperedge> constructHyperedges(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples, Set<Example> parsedExamples, Map<Integer, List<Example>> positiveExamplesByComponent) throws IOException {
-        Set<Hyperedge> hyperedges = new HashSet<>();
-        Map<Boolean, List<Example>> categorizedExamples = parsedExamples.stream().collect(Collectors.groupingBy(Example::getCategory));
-
-        Set<Integer> positiveExamplesByComponentKeySet = positiveExamplesByComponent.keySet();
-        for (Integer positiveExamplesByComponentKey : positiveExamplesByComponentKeySet) {
-            // construct the hyperedge that joins all the examples of the component from the triples of the first example.
-            Example c = positiveExamplesByComponent.get(positiveExamplesByComponentKey).get(0);
-
-            Set<ExampleEntry<String, Triple>> componentCandidateTriples = candidateTriples.get(c);
-
-            Map<Boolean, Integer> completeQueryCoverage = utilsJena.verifyCompleteQueryForHyperedges(componentCandidateTriples, categorizedExamples, positiveExamplesByComponentKey);
-
-            // Piece of code to protect those triples that are the only ones extracting a selected variable.
-            for (String key : triplesBySelectedVariable.keySet()) {
-                if (triplesBySelectedVariable.get(key).size() == 1) {
-                    hyperedges.add(new Hyperedge(triplesBySelectedVariable.get(key).get(0), Float.MAX_VALUE));
-                    Iterator<ExampleEntry<String, Triple>> componentCandidateTriplesIterator = componentCandidateTriples.iterator();
-                    while (componentCandidateTriplesIterator.hasNext()) {
-                        Triple triple = componentCandidateTriplesIterator.next().getValue();
-                        if (triple.equals(triplesBySelectedVariable.get(key).get(0))) {
-                            componentCandidateTriplesIterator.remove();
-                            break;
-                        }
-                    }
-                }
-            }
-
-            double totalInformationGain = computeInformationGain(completeQueryCoverage.get(Example.CATEGORY_POSITIVE), completeQueryCoverage.get(Example.CATEGORY_NEGATIVE));
-
-            componentCandidateTriples.parallelStream().forEach(cct -> {
-                Set<ExampleEntry<String, Triple>> componentCandidateTriplesWithoutCct = new HashSet<>(componentCandidateTriples);
-                componentCandidateTriplesWithoutCct.remove(cct);
-                Map<Boolean, Integer> partialQueryCoverage = utilsJena.verifyCompleteQueryForHyperedges(componentCandidateTriplesWithoutCct, categorizedExamples, positiveExamplesByComponentKey);
-                double cctInformationGain = totalInformationGain - computeInformationGain(partialQueryCoverage.get(Example.CATEGORY_POSITIVE), partialQueryCoverage.get(Example.CATEGORY_NEGATIVE));
-                hyperedges.add(new Hyperedge(cct.getValue(), cctInformationGain));
-            });
-        }
-
-        return hyperedges;
-    }
 
     /**
      * @param componentCandidateTriples set of candidate triples to find a variable value. The structure is <Example, Triple>
@@ -340,6 +312,7 @@ public class QueryLearner {
 
                     variableNames.put(cct.getKey(), newSubject);
                     variableNames.put(cct.getValue().getObject().toString(), newObject);
+
                     cct.setValue(new Triple(newSubject, cct.getValue().getPredicate(), newObject));
 
                     if (newSubject.toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN)) {
@@ -375,6 +348,7 @@ public class QueryLearner {
                         newPredicate = NodeFactory.createVariable("x" + nsvIndex++);
 
                     variableNames.put(cct.getKey(), newPredicate);
+
                     cct.setValue(new Triple(cct.getValue().getSubject(), newPredicate, cct.getValue().getObject()));
 
                     if (newPredicate.toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN)) {
@@ -409,6 +383,7 @@ public class QueryLearner {
 
                     variableNames.put(cct.getKey(), newObject);
                     variableNames.put(cct.getValue().getSubject().toString(), newSubject);
+
                     cct.setValue(new Triple(newSubject, cct.getValue().getPredicate(), newObject));
 
                     if (newObject.toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN)) {
@@ -440,44 +415,8 @@ public class QueryLearner {
         return svIndex;
     }
 
-    private double computeInformationGain(Integer positiveExamplesCovered, Integer negativeExamplesCovered) {
-        return Math.log(((double) positiveExamplesCovered) / (positiveExamplesCovered + negativeExamplesCovered));
+    private double computeInformationGain(Integer positiveExamplesCovered) {
+        return -(Math.log(((double) positiveExamplesCovered) / parsedExamples.size()) / Math.log(2));
     }
-
-    private double computeInformationGain(Set<List<String>> queryValuation, Map<Boolean, List<Example>> examples) {
-        Map<Integer, List<Example>> positiveExamplesByGroup = examples.get(Example.CATEGORY_POSITIVE).stream().collect(Collectors.groupingBy(Example::getGroup));
-        Map<Integer, List<Example>> negativeExamplesByGroup = new HashMap<>();
-        if (null != examples.get(Example.CATEGORY_NEGATIVE))
-            negativeExamplesByGroup = examples.get(Example.CATEGORY_NEGATIVE).stream().collect(Collectors.groupingBy(Example::getGroup));
-
-        int positiveExamplesFoundCounter = 0;
-        int negativeExamplesFoundCounter = 0;
-        for (List<String> row : queryValuation) {
-            boolean found = false;
-            Set<Integer> positiveExamplesKeys = positiveExamplesByGroup.keySet();
-            for (Integer positiveExampleKey : positiveExamplesKeys) {
-                if (found) break;
-                List<Example> ithGroup = positiveExamplesByGroup.get(positiveExampleKey);
-                List<String> ithGroupAsList = exampleUtils.getExamplesAsListOfString(ithGroup);
-                found = (row.size() == ithGroupAsList.size()) && ((!ithGroupAsList.containsAll(row)) ? false : row.containsAll(ithGroupAsList));
-                if (found)
-                    positiveExamplesFoundCounter++;
-            }
-
-            Set<Integer> negativeExamplesKeys = negativeExamplesByGroup.keySet();
-            for (Integer negativeExampleKey : negativeExamplesKeys) {
-                if (found) break;
-
-                List<Example> ithGroup = negativeExamplesByGroup.get(negativeExampleKey);
-                List<String> ithGroupAsList = exampleUtils.getExamplesAsListOfString(ithGroup);
-                found = (row.size() == ithGroupAsList.size()) && ((!ithGroupAsList.containsAll(row)) ? false : row.containsAll(ithGroupAsList));
-                if (found)
-                    negativeExamplesFoundCounter++;
-            }
-        }
-
-        return Math.log(((double) positiveExamplesFoundCounter) / (positiveExamplesFoundCounter + negativeExamplesFoundCounter));
-    }
-
 
 }

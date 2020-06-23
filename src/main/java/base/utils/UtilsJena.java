@@ -1,7 +1,6 @@
 package base.utils;
 
 import base.domain.Example;
-import base.domain.ExampleEntry;
 import org.apache.commons.validator.routines.UrlValidator;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
@@ -17,7 +16,6 @@ import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.stream.Collectors;
 
 /**
  * @author Leandro Tabares Martín
@@ -87,18 +85,16 @@ public class UtilsJena {
         return UrlValidator.getInstance().isValid(example) ? "<" + example + ">" : "'" + example + "'";
     }
 
-    public Map<Boolean, Integer> verifyCompleteQueryForHyperedges(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Map<Boolean, List<Example>> categorizedExamples, Integer componentIndex) {
+
+    public Map<Boolean, Integer> verifyBasicGraphPattern(Set<Triple> triples, Map<Boolean, List<Example>> categorizedExamples) {
         Map<Boolean, Integer> results = new HashMap<>();
         results.put(Example.CATEGORY_POSITIVE, 0);
         results.put(Example.CATEGORY_NEGATIVE, 0);
 
         if (null != categorizedExamples.get(Example.CATEGORY_POSITIVE)) {
-            List<Example> positiveExamplesInTheComponent = categorizedExamples.get(Example.CATEGORY_POSITIVE).stream()
-                    .filter(example -> example.getPosition().equals(componentIndex))
-                    .collect(Collectors.toList());
-            for (Example example : positiveExamplesInTheComponent) {
-                String query = constructAskQuery(componentCandidateTriples, example);
-                if (runAskQuery(query)) {
+            for (Example example : categorizedExamples.get(Example.CATEGORY_POSITIVE)) {
+                String query = constructAskQuery(triples, example);
+                if ((query.contains(example.getExample())) && (runAskQuery(query))) {
                     Integer value = results.get(Example.CATEGORY_POSITIVE);
                     results.replace(Example.CATEGORY_POSITIVE, ++value);
                 }
@@ -106,12 +102,9 @@ public class UtilsJena {
         }
 
         if (null != categorizedExamples.get(Example.CATEGORY_NEGATIVE)) {
-            List<Example> negativeExamplesInTheComponent = categorizedExamples.get(Example.CATEGORY_NEGATIVE).stream()
-                    .filter(example -> example.getPosition().equals(componentIndex))
-                    .collect(Collectors.toList());
-            for (Example example : negativeExamplesInTheComponent) {
-                String query = constructAskQuery(componentCandidateTriples, example);
-                if (runAskQuery(query)) {
+            for (Example example : categorizedExamples.get(Example.CATEGORY_NEGATIVE)) {
+                String query = constructAskQuery(triples, example);
+                if ((query.contains(example.getExample())) && (runAskQuery(query))) {
                     Integer value = results.get(Example.CATEGORY_NEGATIVE);
                     results.replace(Example.CATEGORY_NEGATIVE, ++value);
                 }
@@ -121,14 +114,12 @@ public class UtilsJena {
         return results;
     }
 
-    private String constructAskQuery(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Example example) {
+    private String constructAskQuery(Set<Triple> triples, Example example) {
         StringBuilder stringBuilder = new StringBuilder();
 
         stringBuilder.append("ASK ");
         stringBuilder.append("WHERE { ");
-        for (ExampleEntry<String, Triple> cct : componentCandidateTriples) {
-            Triple triple = cct.getValue();
-
+        for (Triple triple : triples) {
             if (triple.getSubject().toString().contains(SELECTED_VARIABLE_PATTERN)) {
                 Node newSubject = NodeFactory.createLiteral(example.getExample());
                 triple = new Triple(newSubject, triple.getPredicate(), triple.getObject());

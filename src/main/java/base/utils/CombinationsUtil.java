@@ -6,6 +6,7 @@ import java.util.List;
 
 public class CombinationsUtil {
     public static List<List<String>> generateCombinations(int n) {
+        int count = 0;
         List<List<String>> combinations = new ArrayList<>();
         for (int i = 0; i < n; i++) {
             List<String> newRow = new ArrayList<>();
@@ -16,11 +17,14 @@ public class CombinationsUtil {
                 int rowSize = row.size();
                 for (int k = 0; k < rowSize; k++) {
                     String valueString = row.get(k);
-                    valueString += " " + String.valueOf(i);
+                    valueString += " " + i;
                     row.add(valueString);
+                    count++;
                 }
                 combinations.remove(j);
                 combinations.add(j, row);
+                if (count > 1000000)
+                    return combinations;
             }
         }
         return combinations;
