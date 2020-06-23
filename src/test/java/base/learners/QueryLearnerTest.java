@@ -80,4 +80,24 @@ class QueryLearnerTest {
             e.printStackTrace();
         }
     }
+
+    @Test
+    void positiveAndNegativeMultipleVariableExamples() {
+        String examples = "+<Fidel, Cuba, male> +<Leonardo, Italy, male> -<blue, plane, tree>";
+        try {
+            Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
+            System.out.println("===================================================");
+            System.out.println("Result: ");
+            if (!learnedQueries.isPresent())
+                System.out.println("Nothing learned.");
+            else
+                learnedQueries.stream().forEach(query -> System.out.println(query));
+
+            System.out.println("===================================================");
+        } catch (ParseException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }
