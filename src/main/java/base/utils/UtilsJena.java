@@ -121,11 +121,19 @@ public class UtilsJena {
         stringBuilder.append("WHERE { ");
         for (Triple triple : triples) {
             if (triple.getSubject().toString().contains(SELECTED_VARIABLE_PATTERN)) {
-                Node newSubject = NodeFactory.createLiteral(example.getExample());
-                triple = new Triple(newSubject, triple.getPredicate(), triple.getObject());
+                String subjectString = triple.getSubject().toString();
+                String selectedVariableIndexString = subjectString.substring(3);
+                if (example.getPosition().equals(Integer.valueOf(selectedVariableIndexString))) {
+                    Node newSubject = NodeFactory.createLiteral(example.getExample());
+                    triple = new Triple(newSubject, triple.getPredicate(), triple.getObject());
+                }
             } else if (triple.getObject().toString().contains(SELECTED_VARIABLE_PATTERN)) {
-                Node newObject = NodeFactory.createLiteral(example.getExample());
-                triple = new Triple(triple.getSubject(), triple.getPredicate(), newObject);
+                String objectString = triple.getObject().toString();
+                String selectedVariableIndexString = objectString.substring(3);
+                if (example.getPosition().equals(Integer.valueOf(selectedVariableIndexString))) {
+                    Node newObject = NodeFactory.createLiteral(example.getExample());
+                    triple = new Triple(triple.getSubject(), triple.getPredicate(), newObject);
+                }
             }
 
             stringBuilder.append(getSparqlCompatibleTriple(triple) + ". ");
