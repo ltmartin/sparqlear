@@ -18,9 +18,7 @@ public class PropertiesService {
     public Hashtable<Integer, Property> loadProperties() {
         logger.log(Level.INFO, "Loading ranked properties...");
         Hashtable<Integer, Property> rankedProperties = new Hashtable<>();
-        propertyRepository.findAll().forEach(property -> {
-            rankedProperties.put(property.hashCode(), property);
-        });
+        propertyRepository.findAll().forEach(property -> rankedProperties.put(property.hashCode(), property));
         logger.log(Level.INFO, "Ranked properties successfully loaded.");
         return rankedProperties;
     }

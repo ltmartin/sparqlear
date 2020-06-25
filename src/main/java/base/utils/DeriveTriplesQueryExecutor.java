@@ -15,9 +15,6 @@ import java.util.logging.Logger;
 public class DeriveTriplesQueryExecutor extends RecursiveTask<Set<Triple>> {
     private final Logger logger = Logger.getLogger(DeriveTriplesQueryExecutor.class.getName());
     public static final byte NONE_SELECTOR = 0;
-    private final byte SUBJECT_SELECTOR = 1;
-    private final byte PREDICATE_SELECTOR = 2;
-    private final byte OBJECT_SELECTOR = 3;
 
     private String endpoint;
     private String exampleSubjectQuery;
@@ -29,12 +26,23 @@ public class DeriveTriplesQueryExecutor extends RecursiveTask<Set<Triple>> {
 
     @Override
     protected Set<Triple> compute() {
-        Set<Triple> results = new HashSet<>();
+        Set<Triple> results;
+        final byte SUBJECT_SELECTOR = 1;
+        final byte PREDICATE_SELECTOR = 2;
+        final byte OBJECT_SELECTOR = 3;
         switch (selector) {
-            case NONE_SELECTOR : { break; }
-            case SUBJECT_SELECTOR : { return runSubjectQuery(); }
-            case PREDICATE_SELECTOR : { return runPredicateQuery(); }
-            case OBJECT_SELECTOR : { return runObjectQuery(); }
+            case NONE_SELECTOR: {
+                break;
+            }
+            case SUBJECT_SELECTOR: {
+                return runSubjectQuery();
+            }
+            case PREDICATE_SELECTOR: {
+                return runPredicateQuery();
+            }
+            case OBJECT_SELECTOR: {
+                return runObjectQuery();
+            }
         }
 
         DeriveTriplesQueryExecutor subjectQueryTask = new DeriveTriplesQueryExecutor(endpoint, exampleSubjectQuery, examplePredicateQuery, exampleObjectQuery, example, SUBJECT_SELECTOR);

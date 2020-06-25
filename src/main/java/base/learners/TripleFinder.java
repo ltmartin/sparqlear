@@ -49,9 +49,7 @@ public class TripleFinder {
         Set<ExampleEntry<String, Triple>> queue;
         try {
             queue = (Set<ExampleEntry<String, Triple>>) utilsJena.deriveTriples(example, dataset, limit, offset).stream()
-                    .map(t -> {
-                        return new ExampleEntry<String, Triple>(example, (Triple) t);
-                    })
+                    .map(t -> new ExampleEntry<>(example, (Triple) t))
                     .collect(Collectors.toCollection(QueueSet::new));
 
             while ((!queue.isEmpty()) && (candidateTriples.size() < limit)){
@@ -91,9 +89,7 @@ public class TripleFinder {
     private void derive(String example, Optional<String> dataset, int limit, Set<ExampleEntry<String, Triple>> candidateTriples, Set<ExampleEntry<String, Triple>> queue, String item, int offset) throws IOException {
         if (!example.equals(item)) {
             queue.addAll((Set<ExampleEntry<String, Triple>>) utilsJena.deriveTriples(item, dataset, limit - candidateTriples.size(), offset).stream()
-                    .map(t -> {
-                        return new ExampleEntry<String, Triple>(item, (Triple) t);
-                    })
+                    .map(t -> new ExampleEntry<>(item, (Triple) t))
                     .collect(Collectors.toCollection(QueueSet::new)));
         }
     }

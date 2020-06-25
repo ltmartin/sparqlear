@@ -21,6 +21,6 @@ class CombinationsUtilTest {
         expected.add(List.of("3", "3 4"));
         expected.add(List.of("4"));
 
-        Assertions.assertTrue(results.equals(expected));
+        Assertions.assertEquals(results, expected);
     }
 }

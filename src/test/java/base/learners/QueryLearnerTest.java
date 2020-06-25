@@ -33,11 +33,9 @@ class QueryLearnerTest {
             if (!learnedQueries.isPresent())
                 System.out.println("Nothing learned.");
             else
-                learnedQueries.stream().forEach(query -> System.out.println(query));
+                learnedQueries.stream().forEach(System.out::println);
             System.out.println("===================================================");
-        } catch (ParseException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
+        } catch (ParseException | IOException e) {
             e.printStackTrace();
         }
     }
@@ -52,11 +50,9 @@ class QueryLearnerTest {
             if (!learnedQueries.isPresent())
                 System.out.println("Nothing learned");
             else
-                learnedQueries.stream().forEach(query -> System.out.println(query));
+                learnedQueries.stream().forEach(System.out::println);
             System.out.println("===================================================");
-        } catch (ParseException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
+        } catch (ParseException | IOException e) {
             e.printStackTrace();
         }
     }
@@ -71,12 +67,10 @@ class QueryLearnerTest {
             if (!learnedQueries.isPresent())
                 System.out.println("Nothing learned.");
             else
-                learnedQueries.stream().forEach(query -> System.out.println(query));
+                learnedQueries.stream().forEach(System.out::println);
 
             System.out.println("===================================================");
-        } catch (ParseException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
+        } catch (ParseException | IOException e) {
             e.printStackTrace();
         }
     }
@@ -91,12 +85,10 @@ class QueryLearnerTest {
             if (!learnedQueries.isPresent())
                 System.out.println("Nothing learned.");
             else
-                learnedQueries.stream().forEach(query -> System.out.println(query));
+                learnedQueries.stream().forEach(System.out::println);
 
             System.out.println("===================================================");
-        } catch (ParseException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
+        } catch (ParseException | IOException e) {
             e.printStackTrace();
         }
     }

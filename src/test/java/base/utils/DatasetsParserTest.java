@@ -24,7 +24,7 @@ class DatasetsParserTest {
         } catch (ParseException e) {
             e.printStackTrace();
         }
-        Assertions.assertTrue(expectedOutput.size() == output.size() && expectedOutput.containsAll(output) && output.containsAll(expectedOutput));
+        Assertions.assertTrue((expectedOutput.size() == output.size()) && expectedOutput.containsAll(output) && output.containsAll(expectedOutput));
     }
 
     @Test
@@ -37,6 +37,6 @@ class DatasetsParserTest {
         } catch (ParseException e) {
             e.printStackTrace();
         }
-        Assertions.assertTrue(expectedOutput.size() == output.size() && expectedOutput.containsAll(output) && output.containsAll(expectedOutput));
+        Assertions.assertTrue((expectedOutput.size() == output.size()) && expectedOutput.containsAll(output) && output.containsAll(expectedOutput));
     }
 }

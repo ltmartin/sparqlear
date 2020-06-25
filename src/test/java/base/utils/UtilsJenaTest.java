@@ -24,7 +24,7 @@ class UtilsJenaTest {
     public void deriveTriples(){
         try {
             Set<Triple> results = utilsJena.deriveTriples(example, Optional.empty(), limit, 0);
-            results.forEach((Triple t) -> System.out.println(t));
+            results.forEach(System.out::println);
         } catch (IOException e) {
             e.printStackTrace();
         }

@@ -1,5 +1,7 @@
 package base.domain;
 
+import java.util.Objects;
+
 public class Example implements Comparable<Example> {
     public static final Boolean CATEGORY_POSITIVE = true;
     public static final Boolean CATEGORY_NEGATIVE = false;
@@ -39,7 +41,7 @@ public class Example implements Comparable<Example> {
 
         Example example1 = (Example) o;
 
-        if (group != null ? !group.equals(example1.group) : example1.group != null) return false;
+        if (!Objects.equals(group, example1.group)) return false;
         if (!example.equals(example1.example)) return false;
         return category.equals(example1.category);
     }
@@ -55,7 +57,7 @@ public class Example implements Comparable<Example> {
 
     @Override
     public int compareTo(Example o) {
-        if (this.getGroup() != o.getGroup())
+        if (!this.getGroup().equals(o.getGroup()))
             return this.getGroup().compareTo(o.getGroup());
         else if (!this.getExample().equals(o.getExample()))
             return this.getExample().compareTo(o.getExample());

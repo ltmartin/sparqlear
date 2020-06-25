@@ -78,7 +78,7 @@ public class QueryLearner {
         Set<Example> positiveExamples = new HashSet<>(categorizedExamples.get(Example.CATEGORY_POSITIVE));
         Map<Integer, List<Example>> positiveExamplesByComponent = positiveExamples.stream().collect(Collectors.groupingBy(Example::getPosition));
         Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples = deriveCandidateTriples(positiveExamplesByComponent, Optional.empty(), 0);
-        Map<Example, Set<ExampleEntry<String, Triple>>> commonTriples = new HashMap<>();
+        Map<Example, Set<ExampleEntry<String, Triple>>> commonTriples;
 
         if (null == parsedDatasets) {
             int i = 1;
@@ -96,6 +96,7 @@ public class QueryLearner {
                     if (null == moreCandidateTriples || moreCandidateTriples.isEmpty())
                         return Optional.empty();
 
+                    assert candidateTriples != null;
                     candidateTriples.putAll(moreCandidateTriples);
                     i++;
                 }
@@ -124,12 +125,12 @@ public class QueryLearner {
         List<String> selectedVariablesSorted = new ArrayList<>(selectedVariables);
         Collections.sort(selectedVariablesSorted);
         for (String sv : selectedVariablesSorted) {
-            stringBuilder.append(sv + " ");
+            stringBuilder.append(sv).append(" ");
         }
 
         stringBuilder.append("WHERE { ");
         for (Triple triple : bgp.getTriples()) {
-            stringBuilder.append(utilsJena.getSparqlCompatibleTriple(triple) + " . ");
+            stringBuilder.append(utilsJena.getSparqlCompatibleTriple(triple)).append(" . ");
         }
         stringBuilder.append("}");
 
@@ -165,8 +166,8 @@ public class QueryLearner {
                 Set<Node> selectedVariablesIncluded = new HashSet<>();
 
                 List<Integer> indexes = new ArrayList<>();
-                for (int i = 0; i < stringIndexes.length; i++) {
-                    indexes.add(Integer.valueOf(stringIndexes[i]));
+                for (String stringIndex : stringIndexes) {
+                    indexes.add(Integer.valueOf(stringIndex));
                 }
                 BasicGraphPattern bgp = new BasicGraphPattern();
                 for (Integer index : indexes) {
@@ -259,7 +260,7 @@ public class QueryLearner {
                     }
                 }
                 if (common) {
-                    Set<ExampleEntry<String, Triple>> triples = null;
+                    Set<ExampleEntry<String, Triple>> triples;
                     if (commonTriples.containsKey(example)) {
                         triples = commonTriples.get(example);
                         boolean alreadyAdded = false;
@@ -298,7 +299,7 @@ public class QueryLearner {
 
     private int introduceVariables(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Set<Example> parsedExamples, Map<String, List<Triple>> triplesBySelectedVariable) {
         for (ExampleEntry<String, Triple> cct : componentCandidateTriples) {
-            boolean isExampleProvidedByUser = parsedExamples.stream().filter(example -> example.getExample().equals(cct.getKey())).count() != 0;
+            boolean isExampleProvidedByUser = parsedExamples.stream().anyMatch(example -> example.getExample().equals(cct.getKey()));
 
             if (UtilsJena.getCanonicalExample(cct.getValue().getSubject().toString()).equals(cct.getKey())) {
                 Node newSubject, newObject;

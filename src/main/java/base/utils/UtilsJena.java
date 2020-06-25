@@ -47,7 +47,7 @@ public class UtilsJena {
         // If the example is an URI it should be between <> or between quotes otherwise.
         example = getSparqlCompatibleExample(example);
 
-        String exampleSubject = null, examplePredicate = null, exampleObject = null;
+        String exampleSubject, examplePredicate = null, exampleObject;
 
         if (dataset.isPresent()) {
             exampleSubject = "SELECT ?p ?o FROM " + dataset.get() + " WHERE {" + example + " ?p ?o .} LIMIT " + limit + " OFFSET " + offset;
@@ -136,7 +136,7 @@ public class UtilsJena {
                 }
             }
 
-            stringBuilder.append(getSparqlCompatibleTriple(triple) + ". ");
+            stringBuilder.append(getSparqlCompatibleTriple(triple)).append(". ");
         }
         stringBuilder.append("}");
 
