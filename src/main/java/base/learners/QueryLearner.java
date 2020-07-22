@@ -186,8 +186,8 @@ public class QueryLearner {
 
                 Map<Boolean, Integer> results = utilsJena.verifyBasicGraphPattern(bgp.getTriples(), categorizedExamples);
                 if (0 == results.get(Example.CATEGORY_NEGATIVE)) {
-                    bgp.setInformationGain(computeInformationGain(results.get(Example.CATEGORY_POSITIVE)));
-                    if (bgp.getInformationGain() >= informationGainThreshold)
+                    bgp.setInformation(computeInformation(results.get(Example.CATEGORY_POSITIVE)));
+                    if (bgp.getInformation() >= informationGainThreshold)
                         return bgp;
                 }
             }
@@ -416,7 +416,7 @@ public class QueryLearner {
         return svIndex;
     }
 
-    private double computeInformationGain(Integer positiveExamplesCovered) {
+    private double computeInformation(Integer positiveExamplesCovered) {
         return -(Math.log(((double) positiveExamplesCovered) / parsedExamples.size()) / Math.log(2));
     }
 
