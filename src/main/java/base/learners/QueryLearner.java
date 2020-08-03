@@ -239,18 +239,18 @@ public class QueryLearner {
 
             Set<ExampleEntry<String, Triple>> exampleCandidateTriples = componentCandidateTriples.get(example);
 
-            Map<Example, Set<ExampleEntry<String, Triple>>> otherComponentTriples = new HashMap<>();
+            Map<Example, Set<ExampleEntry<String, Triple>>> otherTriplesInTheComponent = new HashMap<>();
             Set<Example> componentTriplesKeySet = componentCandidateTriples.keySet();
             componentTriplesKeySet.stream().forEach(ctKey -> {
                 if (!ctKey.equals(example))
-                    otherComponentTriples.put(ctKey, componentCandidateTriples.get(ctKey));
+                    otherTriplesInTheComponent.put(ctKey, componentCandidateTriples.get(ctKey));
             });
 
             for (ExampleEntry<String, Triple> ect : exampleCandidateTriples) {
                 boolean common = false;
-                Set<Example> exampleKeys = otherComponentTriples.keySet();
+                Set<Example> exampleKeys = otherTriplesInTheComponent.keySet();
                 for (Example ek : exampleKeys) {
-                    Set<ExampleEntry<String, Triple>> triples = otherComponentTriples.get(ek);
+                    Set<ExampleEntry<String, Triple>> triples = otherTriplesInTheComponent.get(ek);
                     for (ExampleEntry<String, Triple> entry : triples) {
                         if (entry.getValue().getPredicate().equals(ect.getValue().getPredicate())) {
                             common = true;
