@@ -182,12 +182,27 @@ public class QueryLearner {
                         bestIndexes = combination;
                     }
 
-                    if (bestBgp.getInformation() >= informationGainThreshold)
+                    int distinguishedVariablesIncluded = countDistinguishedVariables(bestBgp.getTriples());
+
+                    if ((bestBgp.getInformation() <= informationGainThreshold) && (distinguishedVariablesIncluded == distinguishedVariablesCount))
                         return bestBgp;
                 }
             }
         }
         return null;
+    }
+
+    private int countDistinguishedVariables(Set<Triple> triples) {
+        Set<String> distinguishedVariables = new HashSet<>();
+        triples.parallelStream()
+                .forEach(triple -> {
+                    if (UtilsJena.getCanonicalExample(triple.getSubject().toString()).contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+                        distinguishedVariables.add(UtilsJena.getCanonicalExample(triple.getSubject().toString()));
+                    if (UtilsJena.getCanonicalExample(triple.getObject().toString()).contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+                        distinguishedVariables.add(UtilsJena.getCanonicalExample(triple.getSubject().toString()));
+                });
+
+        return distinguishedVariables.size();
     }
 
     private Map<Example, Set<ExampleEntry<String, Triple>>> deriveCandidateTriples(Map<Integer, List<Example>> positiveExamplesByComponent, Optional<String> dataset, int offset) throws IOException {
