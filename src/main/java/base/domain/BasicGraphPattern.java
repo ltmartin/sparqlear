@@ -7,11 +7,11 @@ import java.util.Set;
 
 public class BasicGraphPattern {
     private Set<Triple> triples;
-    private double informationGain;
+    private double information;
 
     public BasicGraphPattern() {
         triples = new HashSet<>();
-        informationGain = 0.0;
+        information = 0.0;
     }
 
     public Set<Triple> getTriples() {
@@ -22,11 +22,11 @@ public class BasicGraphPattern {
         this.triples = triples;
     }
 
-    public double getInformationGain() {
-        return informationGain;
+    public double getInformation() {
+        return information;
     }
 
-    public void setInformationGain(double informationGain) {
-        this.informationGain = informationGain;
+    public void setInformation(double information) {
+        this.information = information;
     }
 }
