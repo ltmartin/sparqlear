@@ -146,47 +146,51 @@ public class QueryLearner {
         BasicGraphPattern bestBgp = new BasicGraphPattern();
         String bestIndexes = "";
 
-        Set<Integer> componentsKeySet = positiveExamplesByComponent.keySet();
-
-        List<ExampleEntry<String, Triple>> allTriplesInComponent = new ArrayList<>();
-        for (Integer component : componentsKeySet) {
-            List<Example> examplesInComponent = positiveExamplesByComponent.get(component);
-            for (Example example : examplesInComponent) {
-                allTriplesInComponent.addAll(candidateTriples.get(example));
+        List<Triple> allTriples = new ArrayList<>();
+        Set<Example> keys = candidateTriples.keySet();
+        for (Example key : keys) {
+            Set<ExampleEntry<String, Triple>> triples = candidateTriples.get(key);
+            for (ExampleEntry<String, Triple> entry : triples) {
+                allTriples.add(entry.getValue());
             }
+        }
 
-            List<List<String>> combinationIndexes = CombinationsUtil.generateCombinations(allTriplesInComponent.size());
-            combinationIndexes.parallelStream()
-                    .forEach(row -> {
-                        row.sort((c1, c2) -> (c1.length() < c2.length()) ? -1 : (c1.length() > c2.length()) ? 1 : 0);
-                    });
+        Collections.shuffle(allTriples);
 
-            for (List<String> rowCombinationIndexes : combinationIndexes) {
-                for (String combination : rowCombinationIndexes) {
-                    if (!bestIndexes.isEmpty() && !combination.contains(bestIndexes))
-                        continue;
+        List<List<String>> combinationIndexes = CombinationsUtil.generateCombinations(allTriples.size());
+        combinationIndexes.parallelStream()
+                .forEach(row -> {
+                    row.sort((c1, c2) -> (c1.length() < c2.length()) ? -1 : (c1.length() > c2.length()) ? 1 : 0);
+                });
 
-                    BasicGraphPattern bgp = new BasicGraphPattern();
-                    String[] stringIndexes = combination.split(" ");
-                    for (String stringIndex : stringIndexes) {
-                        Integer index = Integer.valueOf(stringIndex);
-                        bgp.getTriples().add(allTriplesInComponent.get(index).getValue());
-                    }
+        for (List<String> rowCombinationIndexes : combinationIndexes) {
+            for (String combination : rowCombinationIndexes) {
+                if (!bestIndexes.isEmpty() && !combination.contains(bestIndexes))
+                    continue;
 
-                    Map<Boolean, Integer> results = utilsJena.verifyBasicGraphPattern(bgp.getTriples(), categorizedExamples);
-                    bgp.setInformation(computeInformation(results.get(Example.CATEGORY_POSITIVE)));
-
-                    if (bestBgp.getTriples().isEmpty() || (bgp.getInformation() < bestBgp.getInformation())) {
-                        bestBgp.setTriples(bgp.getTriples());
-                        bestBgp.setInformation(bgp.getInformation());
-                        bestIndexes = combination;
-                    }
-
-                    int distinguishedVariablesIncluded = countDistinguishedVariables(bestBgp.getTriples());
-
-                    if ((bestBgp.getInformation() <= informationGainThreshold) && (distinguishedVariablesIncluded == distinguishedVariablesCount))
-                        return bestBgp;
+                BasicGraphPattern bgp = new BasicGraphPattern();
+                String[] stringIndexes = combination.split(" ");
+                for (String stringIndex : stringIndexes) {
+                    Integer index = Integer.valueOf(stringIndex);
+                    bgp.getTriples().add(allTriples.get(index));
                 }
+
+                int distinguishedVariablesIncluded = countDistinguishedVariables(bgp.getTriples());
+                if (distinguishedVariablesIncluded < distinguishedVariablesCount)
+                    continue;
+
+                Map<Boolean, Integer> results = utilsJena.verifyBasicGraphPattern(bgp.getTriples(), categorizedExamples);
+                bgp.setInformation(computeInformation(results.get(Example.CATEGORY_POSITIVE)));
+
+                if (bestBgp.getTriples().isEmpty() || (bgp.getInformation() < bestBgp.getInformation())) {
+                    bestBgp.setTriples(bgp.getTriples());
+                    bestBgp.setInformation(bgp.getInformation());
+                    bestIndexes = combination;
+                }
+
+
+                if ((bestBgp.getInformation() <= informationGainThreshold) && (distinguishedVariablesIncluded == distinguishedVariablesCount))
+                    return bestBgp;
             }
         }
         return null;
@@ -194,12 +198,12 @@ public class QueryLearner {
 
     private int countDistinguishedVariables(Set<Triple> triples) {
         Set<String> distinguishedVariables = new HashSet<>();
-        triples.parallelStream()
+        triples.stream()
                 .forEach(triple -> {
                     if (UtilsJena.getCanonicalExample(triple.getSubject().toString()).contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
                         distinguishedVariables.add(UtilsJena.getCanonicalExample(triple.getSubject().toString()));
                     if (UtilsJena.getCanonicalExample(triple.getObject().toString()).contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
-                        distinguishedVariables.add(UtilsJena.getCanonicalExample(triple.getSubject().toString()));
+                        distinguishedVariables.add(UtilsJena.getCanonicalExample(triple.getObject().toString()));
                 });
 
         return distinguishedVariables.size();
