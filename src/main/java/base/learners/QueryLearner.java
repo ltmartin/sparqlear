@@ -157,7 +157,10 @@ public class QueryLearner {
             }
 
             List<List<String>> combinationIndexes = CombinationsUtil.generateCombinations(allTriplesInComponent.size());
-            combinationIndexes.sort((l1, l2) -> (l1.size() < l2.size()) ? -1 : (l1.size() > l2.size()) ? 1 : 0);
+            combinationIndexes.parallelStream()
+                    .forEach(row -> {
+                        row.sort((c1, c2) -> (c1.length() < c2.length()) ? -1 : (c1.length() > c2.length()) ? 1 : 0);
+                    });
 
             for (List<String> rowCombinationIndexes : combinationIndexes) {
                 for (String combination : rowCombinationIndexes) {
