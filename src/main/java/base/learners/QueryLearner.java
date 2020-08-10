@@ -143,7 +143,6 @@ public class QueryLearner {
     }
 
     private BasicGraphPattern constructBasicGraphPattern(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples, Map<Boolean, List<Example>> categorizedExamples, int numberOfSelectedVariables) {
-        BasicGraphPattern bgp = new BasicGraphPattern();
         BasicGraphPattern bestBgp = new BasicGraphPattern();
         String bestIndexes = "";
 
@@ -167,25 +166,27 @@ public class QueryLearner {
                     if (!bestIndexes.isEmpty() && !combination.contains(bestIndexes))
                         continue;
 
+                    BasicGraphPattern bgp = new BasicGraphPattern();
                     String[] stringIndexes = combination.split(" ");
                     for (String stringIndex : stringIndexes) {
                         Integer index = Integer.valueOf(stringIndex);
                         bgp.getTriples().add(allTriplesInComponent.get(index).getValue());
-
-                        Map<Boolean, Integer> results = utilsJena.verifyBasicGraphPattern(bgp.getTriples(), categorizedExamples);
-                        bgp.setInformation(computeInformation(results.get(Example.CATEGORY_POSITIVE)));
-
-                        if (bestBgp.getTriples().isEmpty() || (bgp.getInformation() < bestBgp.getInformation())) {
-                            bestBgp.setTriples(bgp.getTriples());
-                            bestBgp.setInformation(bgp.getInformation());
-                            bestIndexes += stringIndex + " ";
-                        }
                     }
+
+                    Map<Boolean, Integer> results = utilsJena.verifyBasicGraphPattern(bgp.getTriples(), categorizedExamples);
+                    bgp.setInformation(computeInformation(results.get(Example.CATEGORY_POSITIVE)));
+
+                    if (bestBgp.getTriples().isEmpty() || (bgp.getInformation() < bestBgp.getInformation())) {
+                        bestBgp.setTriples(bgp.getTriples());
+                        bestBgp.setInformation(bgp.getInformation());
+                        bestIndexes = combination;
+                    }
+
+                    if (bestBgp.getInformation() >= informationGainThreshold)
+                        return bestBgp;
                 }
             }
         }
-        if (bestBgp.getInformation() >= informationGainThreshold)
-            return bestBgp;
         return null;
     }
 
