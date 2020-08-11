@@ -155,7 +155,31 @@ public class QueryLearner {
             }
         }
 
-        Collections.shuffle(allTriples);
+        allTriples = allTriples.stream()
+                .sorted((t1, t2) -> {
+                    if (t1.toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN) && !t2.toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+                        return -1;
+                    else if (!t1.toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN) && t2.toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+                        return 1;
+                    else
+                        return 0;
+                })
+                .collect(Collectors.toList());
+
+        int lastTripleWithDistinguishedVariableIndex = 0;
+        for (int i = 0; i < allTriples.size(); i++) {
+            if (allTriples.get(i).toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+                lastTripleWithDistinguishedVariableIndex = i;
+            else
+                break;
+        }
+
+        List<Triple> triplesWithSelectedVariables = allTriples.subList(0, lastTripleWithDistinguishedVariableIndex);
+        Collections.shuffle(triplesWithSelectedVariables);
+
+        for (int i = 0; i < triplesWithSelectedVariables.size(); i++) {
+            allTriples.set(i, triplesWithSelectedVariables.get(i));
+        }
 
         List<List<String>> combinationIndexes = CombinationsUtil.generateCombinations(allTriples.size());
         combinationIndexes.parallelStream()
