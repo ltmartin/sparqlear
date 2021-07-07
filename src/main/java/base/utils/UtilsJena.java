@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.Resource;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.ForkJoinPool;
@@ -31,6 +32,8 @@ public class UtilsJena {
     private String endpoint;
     @Value("${sparqlear.sparql.timeout}")
     private Integer timeout;
+    @Resource
+    private DeriveTriplesQueryExecutor deriveTriplesQueryExecutor;
 
     /**
      * Method to derive the triples directly related with a example.
@@ -47,29 +50,15 @@ public class UtilsJena {
         // If the example is an URI it should be between <> or between quotes otherwise.
         example = getSparqlCompatibleExample(example);
 
-        String exampleSubject, examplePredicate = null, exampleObject;
+        String exampleObject;
 
         if (dataset.isPresent()) {
-            exampleSubject = "SELECT ?p ?o FROM " + dataset.get() + " WHERE {" + example + " ?p ?o .} LIMIT " + limit + " OFFSET " + offset;
-
-            // Only URIs are valid predicates according to the SPARQL specification.
-            if (UrlValidator.getInstance().isValid(example))
-                examplePredicate = "SELECT ?s ?o FROM " + dataset.get() + " WHERE { ?s " + example + " ?o .} LIMIT " + limit + " OFFSET " + offset;
-
-            exampleObject = "SELECT ?s ?p FROM " + dataset.get() + " WHERE { ?s ?p " + example + " .} LIMIT " + limit + " OFFSET " + offset;
+            exampleObject = "SELECT ?s ?p FROM " + dataset.get() + " WHERE { ?s ?p ?o . FILTER regex(?o, " + example + ") } LIMIT " + limit + " OFFSET " + offset;
         } else {
-            exampleSubject = "SELECT ?p ?o WHERE {" + example + " ?p ?o .} LIMIT " + limit + " OFFSET " + offset;
-
-            // Only URIs are valid predicates according to the SPARQL specification.
-            if (UrlValidator.getInstance().isValid(UtilsJena.getCanonicalExample(example)))
-                examplePredicate = "SELECT ?s ?o WHERE { ?s " + example + " ?o .} LIMIT " + limit + " OFFSET " + offset;
-
-            exampleObject = "SELECT ?s ?p WHERE { ?s ?p " + example + " .} LIMIT " + limit + " OFFSET " + offset;
+            exampleObject = "SELECT ?s ?p WHERE { ?s ?p ?o . FILTER regex(?o, " + example + ") } LIMIT " + limit + " OFFSET " + offset;
         }
 
-        DeriveTriplesQueryExecutor executorTask = new DeriveTriplesQueryExecutor(endpoint, exampleSubject, examplePredicate, exampleObject, example, DeriveTriplesQueryExecutor.NONE_SELECTOR);
-
-        return new ForkJoinPool().invoke(executorTask);
+        return deriveTriplesQueryExecutor.runObjectQuery(endpoint, exampleObject, example);
     }
 
     public static String getCanonicalExample(String example){

@@ -15,14 +15,13 @@ import java.util.Set;
 
 @SpringBootTest(classes = Application.class)
 class TripleFinderTest {
-    @Value("${sparqlear.test.example}")
-    private String example;
     @Autowired
     private TripleFinder tripleFinder;
 
     @Test
     public void deriveCandidateTriplesTest(){
         try {
+            String example = "Alan Stern";
             long initTime = System.nanoTime();
             Set<ExampleEntry<String, Triple>> candidateTriples = tripleFinder.deriveCandidateTriples(example, Optional.empty(), 0);
             long endTime = System.nanoTime();

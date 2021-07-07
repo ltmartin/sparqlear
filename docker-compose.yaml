@@ -1,0 +1,40 @@
+version: "3.3"
+
+services:
+  converter:
+    depends_on:
+      - virtuoso
+      - postgres
+    links:
+        - virtuoso
+        - postgres
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ltmartin/sparqlear:latest
+    restart: on-failure
+
+  virtuoso:
+    image: openlink/virtuoso-opensource-7:latest
+    restart: always
+    volumes:
+    - /home/leandro/Installations/virtuoso-opensource/database:/database
+    ports:
+    - "8890:8890"
+
+  postgres:
+    image: postgres:latest
+    restart: always
+    ports:
+    - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: example
+      POSTGRES_USER: converter
+    volumes:
+      - /home/leandro/Workspace/Package/postgres_container/postgresdb:/var/lib/postgresql/data
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - 8080:8080
