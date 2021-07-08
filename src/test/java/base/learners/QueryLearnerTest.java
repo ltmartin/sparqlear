@@ -26,7 +26,7 @@ class QueryLearnerTest {
     @Test
     void allPositiveSingleVariableExamples() {
         //String examples = "+Cuba +Venezuela +Colombia";
-        String examples = "+Isaac +Amedeo +Niels";
+        String examples = "+Alan +Albert +Joseph";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");

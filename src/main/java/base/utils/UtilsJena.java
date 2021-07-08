@@ -199,4 +199,13 @@ public class UtilsJena {
 
         return results;
     }
+
+    public static String getCanonicalString(String inputString){
+        inputString = inputString.replaceAll("<","");
+        inputString = inputString.replaceAll(">","");
+        inputString = inputString.replaceAll("'", "");
+        inputString = inputString.replaceAll("\"", "");
+
+        return inputString;
+    }
 }

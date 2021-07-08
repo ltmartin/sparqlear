@@ -3,6 +3,8 @@ package base.learners;
 import base.domain.BasicGraphPattern;
 import base.domain.Example;
 import base.domain.ExampleEntry;
+import base.domain.Motif;
+import base.services.MotifsService;
 import base.services.PropertiesService;
 import base.utils.CombinationsUtil;
 import base.utils.DatasetsParser;
@@ -34,7 +36,7 @@ public class QueryLearner {
     @Resource
     private DatasetsParser datasetsParser;
     @Resource
-    private PropertiesService propertiesService;
+    private MotifsService motifsService;
     @Resource
     private UtilsJena utilsJena;
     @Value("${sparqlear.sparql.endpoint}")
@@ -45,8 +47,6 @@ public class QueryLearner {
     private String resultsLimit;
     @Value("${sparqlear.sparql.datasets}")
     private String datasets;
-    @Value("${sparqlear.verifyPredicatesRank}")
-    private Boolean useRanking;
     @Value("${sparqlear.informationGain.threshold}")
     private double informationGainThreshold;
     @Value("${sparqlear.learnMultipleQueries}")
@@ -72,37 +72,41 @@ public class QueryLearner {
             logger.log(Level.INFO, "Datasets parsed.");
         }
 
+        // Learning the candidate triples
         Map<Boolean, List<Example>> categorizedExamples = parsedExamples.stream()
                 .collect(Collectors.groupingBy(Example::getCategory));
 
         Set<Example> positiveExamples = new HashSet<>(categorizedExamples.get(Example.CATEGORY_POSITIVE));
         Map<Integer, List<Example>> positiveExamplesByComponent = positiveExamples.stream().collect(Collectors.groupingBy(Example::getPosition));
         Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples = deriveCandidateTriples(positiveExamplesByComponent, Optional.empty(), 0);
-        Map<Example, Set<ExampleEntry<String, Triple>>> commonTriples;
+
+        // Extracting the subjects of the candidate triples
+        Set<String> individuals = new HashSet<>();
+        for (Map.Entry<Example, Set<ExampleEntry<String, Triple>>> entry: candidateTriples.entrySet()) {
+            Set<ExampleEntry<String, Triple>> value = entry.getValue();
+            for (ExampleEntry<String, Triple> exampleEntry : value) {
+                individuals.add(exampleEntry.getValue().getSubject().toString());
+            }
+        }
+
+        // Finding the candidate motif instances involving individuals from the candidate triples
+        Set<Motif> candidateMotifInstances = new HashSet<>();
+        for (String ind: individuals) {
+            candidateMotifInstances.addAll(motifsService.findMotifsInvolvingIndividual(ind));
+        }
 
         if (null == parsedDatasets) {
-            int i = 1;
+           // Creating the candidate triple patterns
             do {
-                logger.log(Level.INFO, "Filtering common triples....");
-                commonTriples = filterCommonTriples(candidateTriples, positiveExamplesByComponent);
-                logger.log(Level.INFO, "Common triples filtered.");
-                Set<Example> commonTriplesKeySet = commonTriples.keySet();
-                for (Example example : commonTriplesKeySet) {
-                    selectedVariablesAmount += introduceVariables(commonTriples.get(example), parsedExamples, triplesBySelectedVariable);
+                Set<Example> candidateTriplesKeySet = candidateTriples.keySet();
+                for (Example example : candidateTriplesKeySet) {
+                    selectedVariablesAmount += introduceVariables(candidateTriples.get(example), parsedExamples, triplesBySelectedVariable);
                 }
-                if (selectedVariablesAmount < positiveExamplesByComponent.size()) {
-                    Map<Example, Set<ExampleEntry<String, Triple>>> moreCandidateTriples = deriveCandidateTriples(positiveExamplesByComponent, Optional.empty(), i * limit);
 
-                    if (null == moreCandidateTriples || moreCandidateTriples.isEmpty())
-                        return Optional.empty();
-
-                    assert candidateTriples != null;
-                    candidateTriples.putAll(moreCandidateTriples);
-                    i++;
-                }
             } while (selectedVariablesAmount < positiveExamplesByComponent.size());
 
-            BasicGraphPattern bgp = constructBasicGraphPattern(commonTriples, categorizedExamples, positiveExamplesByComponent.size());
+            // FIXME: Continue here.
+            BasicGraphPattern bgp = constructBasicGraphPattern(candidateTriples, categorizedExamples, positiveExamplesByComponent.size());
             if (null != bgp)
                 derivedQueries.add(buildQuery(bgp));
         } else {
@@ -137,10 +141,10 @@ public class QueryLearner {
         return stringBuilder.toString();
     }
 
-    private BasicGraphPattern constructBasicGraphPattern(Map<Example, Set<ExampleEntry<String, Triple>>> commonTriples, Map<Boolean, List<Example>> categorizedExamples, int numberOfSelectedVariables) {
+    private BasicGraphPattern constructBasicGraphPattern(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples, Map<Boolean, List<Example>> categorizedExamples, int numberOfSelectedVariables) {
         List<ExampleEntry<String, Triple>> allCommonTriples = new LinkedList<>();
 
-        for (Map.Entry<Example, Set<ExampleEntry<String, Triple>>> entry : commonTriples.entrySet()) {
+        for (Map.Entry<Example, Set<ExampleEntry<String, Triple>>> entry : candidateTriples.entrySet()) {
             allCommonTriples.addAll(entry.getValue());
         }
 
@@ -214,93 +218,11 @@ public class QueryLearner {
         return candidateTriples;
     }
 
-    private Map<Example, Set<ExampleEntry<String, Triple>>> filterCommonTriples(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples, Map<Integer, List<Example>> positiveExamplesByComponent) {
-        Map<Example, Set<ExampleEntry<String, Triple>>> commonTriples = new HashMap<>();
-
-        if (null == candidateTriples)
-            return commonTriples;
-
-        Set<Integer> keys = positiveExamplesByComponent.keySet();
-        for (Integer key : keys) {
-            List<Example> examples = positiveExamplesByComponent.get(key);
-            // the structure of this map is <UserProvidedExample, Set of triples that belongs to that example>
-            Map<Example, Set<ExampleEntry<String, Triple>>> componentCandidateTriples = new HashMap<>();
-
-            for (Example example : examples) {
-                Set<Example> candidateTriplesKeySet = candidateTriples.keySet();
-                candidateTriplesKeySet.stream().forEach(ctKey -> {
-                    if (example.equals(ctKey))
-                        componentCandidateTriples.put(ctKey, candidateTriples.get(ctKey));
-                });
-            }
-
-            // this is the first example on each component
-            Example example = examples.get(0);
-
-            Set<ExampleEntry<String, Triple>> exampleCandidateTriples = componentCandidateTriples.get(example);
-
-            Map<Example, Set<ExampleEntry<String, Triple>>> otherTriplesInTheComponent = new HashMap<>();
-            Set<Example> componentTriplesKeySet = componentCandidateTriples.keySet();
-            componentTriplesKeySet.stream().forEach(ctKey -> {
-                if (!ctKey.equals(example))
-                    otherTriplesInTheComponent.put(ctKey, componentCandidateTriples.get(ctKey));
-            });
-
-            for (ExampleEntry<String, Triple> ect : exampleCandidateTriples) {
-                boolean common = false;
-                Set<Example> exampleKeys = otherTriplesInTheComponent.keySet();
-                for (Example ek : exampleKeys) {
-                    Set<ExampleEntry<String, Triple>> triples = otherTriplesInTheComponent.get(ek);
-                    for (ExampleEntry<String, Triple> entry : triples) {
-                        if (entry.getValue().getPredicate().equals(ect.getValue().getPredicate())) {
-                            common = true;
-                            break;
-                        } else
-                            common = false;
-                    }
-                }
-                if (common) {
-                    Set<ExampleEntry<String, Triple>> triples;
-                    if (commonTriples.containsKey(example)) {
-                        triples = commonTriples.get(example);
-                        boolean alreadyAdded = false;
-
-                        for (ExampleEntry<String, Triple> entry : triples) {
-                            if (entry.getValue().getPredicate().equals(ect.getValue().getPredicate())) {
-                                alreadyAdded = true;
-                                break;
-                            }
-                        }
-
-                        if (!alreadyAdded) {
-                            triples.add(ect);
-                            commonTriples.replace(example, triples);
-                        }
-                    } else {
-                        triples = new HashSet<>();
-                        triples.add(ect);
-                        commonTriples.put(example, triples);
-                    }
-                }
-            }
-
-        }
-        return commonTriples;
-    }
-
-
-
-
-    /**
-     * @param componentCandidateTriples set of candidate triples to find a variable value. The structure is <Example, Triple>
-     * @param parsedExamples            the parsed examples set.
-     * @param triplesBySelectedVariable required by the constructHyperedges algorithm to know if the selected variable is present in more than one triple.
-     */
-
     private int introduceVariables(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Set<Example> parsedExamples, Map<String, List<Triple>> triplesBySelectedVariable) {
         for (ExampleEntry<String, Triple> cct : componentCandidateTriples) {
             boolean isExampleProvidedByUser = parsedExamples.stream().anyMatch(example -> example.getExample().equals(cct.getKey()));
 
+            // If the subject is an example
             if (UtilsJena.getCanonicalExample(cct.getValue().getSubject().toString()).equals(cct.getKey())) {
                 Node newSubject, newObject;
                 if (!variableNames.containsKey(cct.getKey())) {
@@ -340,7 +262,9 @@ public class QueryLearner {
                         triplesBySelectedVariable.replace(cct.getValue().getSubject().toString(), tripleList);
                     }
                 }
-            } else if (UtilsJena.getCanonicalExample(cct.getValue().getPredicate().toString()).equals(cct.getKey())) {
+            }
+            // If the predicate is an example
+            else if (UtilsJena.getCanonicalExample(cct.getValue().getPredicate().toString()).equals(cct.getKey())) {
                 Node newPredicate;
                 if (!variableNames.containsKey(cct.getKey())) {
                     if (isExampleProvidedByUser)
@@ -372,7 +296,9 @@ public class QueryLearner {
                         triplesBySelectedVariable.replace(cct.getValue().getPredicate().toString(), tripleList);
                     }
                 }
-            } else if (UtilsJena.getCanonicalExample(cct.getValue().getObject().toString()).equals(cct.getKey())) {
+            }
+            // If the object is an example.
+            else if (UtilsJena.getCanonicalExample(cct.getValue().getObject().toString()).equals(cct.getKey())) {
                 Node newSubject, newObject;
                 if (!variableNames.containsKey(cct.getKey())) {
                     if (isExampleProvidedByUser)
