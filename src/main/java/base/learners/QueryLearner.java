@@ -82,7 +82,7 @@ public class QueryLearner {
 
         // Extracting the subjects of the candidate triples
         Set<String> individuals = new HashSet<>();
-        for (Map.Entry<Example, Set<ExampleEntry<String, Triple>>> entry: candidateTriples.entrySet()) {
+        for (Map.Entry<Example, Set<ExampleEntry<String, Triple>>> entry : candidateTriples.entrySet()) {
             Set<ExampleEntry<String, Triple>> value = entry.getValue();
             for (ExampleEntry<String, Triple> exampleEntry : value) {
                 individuals.add(exampleEntry.getValue().getSubject().toString());
@@ -91,21 +91,17 @@ public class QueryLearner {
 
         // Finding the candidate motif instances involving individuals from the candidate triples
         Set<Motif> candidateMotifInstances = new HashSet<>();
-        for (String ind: individuals) {
+        for (String ind : individuals) {
             candidateMotifInstances.addAll(motifsService.findMotifsInvolvingIndividual(ind));
         }
 
         if (null == parsedDatasets) {
-           // Creating the candidate triple patterns
-            do {
-                Set<Example> candidateTriplesKeySet = candidateTriples.keySet();
-                for (Example example : candidateTriplesKeySet) {
-                    selectedVariablesAmount += introduceVariables(candidateTriples.get(example), parsedExamples, triplesBySelectedVariable);
-                }
+            // Creating the candidate triple patterns
+            Set<Example> candidateTriplesKeySet = candidateTriples.keySet();
+            for (Example example : candidateTriplesKeySet) {
+                introduceVariables(candidateTriples.get(example), parsedExamples, triplesBySelectedVariable, example.getPosition());
+            }
 
-            } while (selectedVariablesAmount < positiveExamplesByComponent.size());
-
-            // FIXME: Continue here.
             BasicGraphPattern bgp = constructBasicGraphPattern(candidateTriples, categorizedExamples, positiveExamplesByComponent.size());
             if (null != bgp)
                 derivedQueries.add(buildQuery(bgp));
@@ -115,194 +111,15 @@ public class QueryLearner {
         return Optional.of(derivedQueries);
     }
 
-    private String buildQuery(BasicGraphPattern bgp) {
-        StringBuilder stringBuilder = new StringBuilder();
-        stringBuilder.append("SELECT DISTINCT ");
-
-        Set<String> selectedVariables = new HashSet<>();
-        for (Triple triple : bgp.getTriples()) {
-            if (triple.getSubject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
-                selectedVariables.add(triple.getSubject().toString());
-            if (triple.getObject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
-                selectedVariables.add(triple.getObject().toString());
-        }
-        List<String> selectedVariablesSorted = new ArrayList<>(selectedVariables);
-        Collections.sort(selectedVariablesSorted);
-        for (String sv : selectedVariablesSorted) {
-            stringBuilder.append(sv).append(" ");
-        }
-
-        stringBuilder.append("WHERE { ");
-        for (Triple triple : bgp.getTriples()) {
-            stringBuilder.append(utilsJena.getSparqlCompatibleTriple(triple)).append(" . ");
-        }
-        stringBuilder.append("}");
-
-        return stringBuilder.toString();
-    }
-
-    private BasicGraphPattern constructBasicGraphPattern(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples, Map<Boolean, List<Example>> categorizedExamples, int numberOfSelectedVariables) {
-        List<ExampleEntry<String, Triple>> allCommonTriples = new LinkedList<>();
-
-        for (Map.Entry<Example, Set<ExampleEntry<String, Triple>>> entry : candidateTriples.entrySet()) {
-            allCommonTriples.addAll(entry.getValue());
-        }
-
-        allCommonTriples = allCommonTriples.stream()
-                .sorted((e1, e2) -> {
-                    if (e1.getValue().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN) && !e2.getValue().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
-                        return -1;
-                    else if (!e1.getValue().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN) && e2.getValue().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
-                        return 1;
-                    else
-                        return 0;
-                })
-                .collect(Collectors.toList());
-
-        List<List<String>> combinationIndexes = CombinationsUtil.generateCombinations(allCommonTriples.size());
-        for (List<String> rowCombinationIndexes : combinationIndexes) {
-            for (String combination : rowCombinationIndexes) {
-                String[] stringIndexes = combination.split(" ");
-                // this is to avoid testing combinations that have a low possibility of being successful
-                if (stringIndexes.length < numberOfSelectedVariables)
-                    continue;
-
-                Set<Node> selectedVariablesIncluded = new HashSet<>();
-
-                List<Integer> indexes = new ArrayList<>();
-                for (String stringIndex : stringIndexes) {
-                    indexes.add(Integer.valueOf(stringIndex));
-                }
-                BasicGraphPattern bgp = new BasicGraphPattern();
-                for (Integer index : indexes) {
-                    Triple triple = allCommonTriples.get(index).getValue();
-
-                    if (triple.getSubject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
-                        selectedVariablesIncluded.add(triple.getSubject());
-                    if (triple.getObject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
-                        selectedVariablesIncluded.add(triple.getObject());
-
-                    bgp.getTriples().add(triple);
-                }
-
-                if (selectedVariablesIncluded.size() < numberOfSelectedVariables)
-                    continue;
-
-                Map<Boolean, Integer> results = utilsJena.verifyBasicGraphPattern(bgp.getTriples(), categorizedExamples);
-                if (0 == results.get(Example.CATEGORY_NEGATIVE)) {
-                    bgp.setInformation(computeInformation(results.get(Example.CATEGORY_POSITIVE)));
-                    if (bgp.getInformation() >= informationGainThreshold)
-                        return bgp;
-                }
-            }
-        }
-        return null;
-    }
-
-    private Map<Example, Set<ExampleEntry<String, Triple>>> deriveCandidateTriples(Map<Integer, List<Example>> positiveExamplesByComponent, Optional<String> dataset, int offset) throws IOException {
-        Set<Integer> componentKeys = positiveExamplesByComponent.keySet();
-
-        Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples = new HashMap<>();
-        logger.log(Level.INFO, "Starting to derive candidate triples...");
-        for (Integer componentKey : componentKeys) {
-            List<Example> componentExamples = positiveExamplesByComponent.get(componentKey);
-            for (Example componentExample : componentExamples) {
-                candidateTriples.put(componentExample, tripleFinder.deriveCandidateTriples(componentExample.getExample(), dataset, offset));
-                // this is because there might be examples that are not present on the dataset, so we can't learn anything from them.
-                if (candidateTriples.get(componentExample).isEmpty())
-                    return null;
-            }
-        }
-        logger.log(Level.INFO, "Candidate triples successfully derived.");
-
-        return candidateTriples;
-    }
-
-    private int introduceVariables(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Set<Example> parsedExamples, Map<String, List<Triple>> triplesBySelectedVariable) {
+    private void introduceVariables(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Set<Example> parsedExamples, Map<String, List<Triple>> triplesBySelectedVariable, Integer componentIndex) {
         for (ExampleEntry<String, Triple> cct : componentCandidateTriples) {
             boolean isExampleProvidedByUser = parsedExamples.stream().anyMatch(example -> example.getExample().equals(cct.getKey()));
 
-            // If the subject is an example
-            if (UtilsJena.getCanonicalExample(cct.getValue().getSubject().toString()).equals(cct.getKey())) {
+            if (UtilsJena.getCanonicalExample(cct.getValue().getObject().toString()).equals(cct.getKey())) {
                 Node newSubject, newObject;
                 if (!variableNames.containsKey(cct.getKey())) {
                     if (isExampleProvidedByUser)
-                        newSubject = NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN + svIndex++);
-                    else
-                        newSubject = NodeFactory.createVariable("x" + nsvIndex++);
-
-                    newObject = NodeFactory.createVariable("x" + nsvIndex++);
-
-                    variableNames.put(cct.getKey(), newSubject);
-                    variableNames.put(cct.getValue().getObject().toString(), newObject);
-
-                    cct.setValue(new Triple(newSubject, cct.getValue().getPredicate(), newObject));
-
-                    if (newSubject.toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN)) {
-                        if (!triplesBySelectedVariable.containsKey(newSubject.toString())) {
-                            List<Triple> tripleList = new LinkedList<>();
-                            tripleList.add(cct.getValue());
-                            triplesBySelectedVariable.put(newSubject.toString(), tripleList);
-                        } else {
-                            List<Triple> tripleList = triplesBySelectedVariable.get(newSubject.toString());
-                            tripleList.add(cct.getValue());
-                            triplesBySelectedVariable.replace(newSubject.toString(), tripleList);
-                        }
-                    }
-                } else {
-                    if (!variableNames.containsKey(cct.getValue().getObject().toString())) {
-                        newObject = NodeFactory.createVariable("x" + nsvIndex++);
-                        variableNames.put(cct.getValue().getObject().toString(), newObject);
-                    }
-                    cct.setValue(new Triple(variableNames.get(cct.getKey()), cct.getValue().getPredicate(), variableNames.get(cct.getValue().getObject().toString())));
-
-                    if (cct.getValue().getSubject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN)) {
-                        List<Triple> tripleList = triplesBySelectedVariable.get(cct.getValue().getSubject().toString());
-                        tripleList.add(cct.getValue());
-                        triplesBySelectedVariable.replace(cct.getValue().getSubject().toString(), tripleList);
-                    }
-                }
-            }
-            // If the predicate is an example
-            else if (UtilsJena.getCanonicalExample(cct.getValue().getPredicate().toString()).equals(cct.getKey())) {
-                Node newPredicate;
-                if (!variableNames.containsKey(cct.getKey())) {
-                    if (isExampleProvidedByUser)
-                        newPredicate = NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN + svIndex++);
-                    else
-                        newPredicate = NodeFactory.createVariable("x" + nsvIndex++);
-
-                    variableNames.put(cct.getKey(), newPredicate);
-
-                    cct.setValue(new Triple(cct.getValue().getSubject(), newPredicate, cct.getValue().getObject()));
-
-                    if (newPredicate.toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN)) {
-                        if (!triplesBySelectedVariable.containsKey(newPredicate.toString())) {
-                            List<Triple> tripleList = new LinkedList<>();
-                            tripleList.add(cct.getValue());
-                            triplesBySelectedVariable.put(newPredicate.toString(), tripleList);
-                        } else {
-                            List<Triple> tripleList = triplesBySelectedVariable.get(newPredicate.toString());
-                            tripleList.add(cct.getValue());
-                            triplesBySelectedVariable.replace(newPredicate.toString(), tripleList);
-                        }
-                    }
-                } else {
-                    cct.setValue(new Triple(cct.getValue().getSubject(), variableNames.get(cct.getKey()), cct.getValue().getObject()));
-
-                    if (cct.getValue().getPredicate().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN)) {
-                        List<Triple> tripleList = triplesBySelectedVariable.get(cct.getValue().getPredicate().toString());
-                        tripleList.add(cct.getValue());
-                        triplesBySelectedVariable.replace(cct.getValue().getPredicate().toString(), tripleList);
-                    }
-                }
-            }
-            // If the object is an example.
-            else if (UtilsJena.getCanonicalExample(cct.getValue().getObject().toString()).equals(cct.getKey())) {
-                Node newSubject, newObject;
-                if (!variableNames.containsKey(cct.getKey())) {
-                    if (isExampleProvidedByUser)
-                        newObject = NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN + svIndex++);
+                        newObject = NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN + componentIndex);
                     else
                         newObject = NodeFactory.createVariable("x" + nsvIndex++);
 
@@ -339,8 +156,89 @@ public class QueryLearner {
                 }
             }
         }
-        return svIndex;
     }
+
+    private String buildQuery(BasicGraphPattern bgp) {
+        StringBuilder stringBuilder = new StringBuilder();
+        stringBuilder.append("SELECT DISTINCT ");
+
+        Set<String> selectedVariables = new HashSet<>();
+        for (Triple triple : bgp.getTriples()) {
+            if (triple.getSubject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+                selectedVariables.add(triple.getSubject().toString());
+            if (triple.getObject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+                selectedVariables.add(triple.getObject().toString());
+        }
+        List<String> selectedVariablesSorted = new ArrayList<>(selectedVariables);
+        Collections.sort(selectedVariablesSorted);
+        for (String sv : selectedVariablesSorted) {
+            stringBuilder.append(sv).append(" ");
+        }
+
+        stringBuilder.append("WHERE { ");
+        for (Triple triple : bgp.getTriples()) {
+            stringBuilder.append(utilsJena.getSparqlCompatibleTriple(triple)).append(" . ");
+        }
+        stringBuilder.append("}");
+
+        return stringBuilder.toString();
+    }
+
+    private BasicGraphPattern constructBasicGraphPattern(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriplePatterns, Map<Boolean, List<Example>> categorizedExamples, int numberOfSelectedVariables) {
+        Map<String, List<Triple>> candidateTriplesByDistinguishedVariable = groupCandidateTriplesByDistinguishedVariable(candidateTriplePatterns);
+        // FIXME: Continue here.
+        //Set<Triple> bestTriplePatterns = selectBestTriplePatterns(candidateTriplesByDistinguishedVariable);
+        return null;
+    }
+
+
+    private Map<String, List<Triple>> groupCandidateTriplesByDistinguishedVariable(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples) {
+        List<ExampleEntry<String, Triple>> allCandidateTriples = new LinkedList<>();
+
+        for (Map.Entry<Example, Set<ExampleEntry<String, Triple>>> entry : candidateTriples.entrySet()) {
+            allCandidateTriples.addAll(entry.getValue());
+        }
+
+        List<ExampleEntry<String, Triple>> candidateTriplesWithDistinguishedVariables = allCandidateTriples.stream()
+                .filter(t -> t.getValue().getObject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+                .collect(Collectors.toList());
+
+        Map<String, List<Triple>> candidateTriplesByDistinguishedVariable = new HashMap<>();
+        for (ExampleEntry<String, Triple> entry : candidateTriplesWithDistinguishedVariables) {
+            Triple triple = entry.getValue();
+
+            String key = triple.getObject().toString();
+            if (candidateTriplesByDistinguishedVariable.containsKey(key)) {
+                List<Triple> triples = new LinkedList<>();
+                triples.addAll(candidateTriplesByDistinguishedVariable.get(key));
+                triples.add(triple);
+                candidateTriplesByDistinguishedVariable.replace(key, triples);
+            } else {
+                candidateTriplesByDistinguishedVariable.put(key, Arrays.asList(triple));
+            }
+        }
+        return candidateTriplesByDistinguishedVariable;
+    }
+
+    private Map<Example, Set<ExampleEntry<String, Triple>>> deriveCandidateTriples(Map<Integer, List<Example>> positiveExamplesByComponent, Optional<String> dataset, int offset) throws IOException {
+        Set<Integer> componentKeys = positiveExamplesByComponent.keySet();
+
+        Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples = new HashMap<>();
+        logger.log(Level.INFO, "Starting to derive candidate triples...");
+        for (Integer componentKey : componentKeys) {
+            List<Example> componentExamples = positiveExamplesByComponent.get(componentKey);
+            for (Example componentExample : componentExamples) {
+                candidateTriples.put(componentExample, tripleFinder.deriveCandidateTriples(componentExample.getExample(), dataset, offset));
+                // this is because there might be examples that are not present on the dataset, so we can't learn anything from them.
+                if (candidateTriples.get(componentExample).isEmpty())
+                    return null;
+            }
+        }
+        logger.log(Level.INFO, "Candidate triples successfully derived.");
+
+        return candidateTriples;
+    }
+
 
     private double computeInformation(Integer positiveExamplesCovered) {
         return -(Math.log(((double) positiveExamplesCovered) / parsedExamples.size()) / Math.log(2));
