@@ -14,7 +14,7 @@ public class ExampleUtils {
     public Set<Example> parseExamples(String examples) throws ParseException {
         Set<Example> parsedExamples = new HashSet<>();
         if (checkStructure(examples)){
-            boolean groupedExamples = examples.contains("<");
+            boolean groupedExamples = examples.contains("(");
             Set<String> splittedStringExamples = new LinkedHashSet<>();
             Collections.addAll(splittedStringExamples, examples.split("\\s(?=\\+|-)"));
 
@@ -51,7 +51,7 @@ public class ExampleUtils {
     }
 
     private boolean checkStructure(String examples) {
-        String pattern = "^((\\+|-){1}((\\w+)|(<\\w+(,\\s\\w+)+>))\\s?)+$";
+        String pattern = "^((\\+|-){1}(([A-Za-z0-9\\-]+)|(\\([A-Za-z0-9\\-]+(,\\s[A-Za-z0-9\\-]+)+\\)))\\s?)+$";
         return examples.matches(pattern);
     }
 

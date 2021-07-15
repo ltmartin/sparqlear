@@ -25,7 +25,7 @@ class QueryLearnerTest {
 
     @Test
     void allPositiveSingleVariableExamples() {
-        String examples = "+Alan +Albert +Joseph";
+        String examples = "+Rafi +Sergey +Igniacio";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");
@@ -42,7 +42,7 @@ class QueryLearnerTest {
 
     @Test
     void positiveAndNegativeSingleVariableExamples() {
-        String examples = "+Alan +Albert +Joseph -1896-06-29";
+        String examples = "+Rafi +Sergey +Igniacio -Italian";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");
@@ -60,7 +60,7 @@ class QueryLearnerTest {
     @Test
     void positiveMultipleVariableExamples() {
         // FIXME: Fix these examples
-        String examples = "+<Newton, England> +<Faraday, England>";
+        String examples = "+(Igniacio, 1908-10-03) +(Rafi, 1903-07-01)";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");

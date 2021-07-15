@@ -21,7 +21,7 @@ class TripleFinderTest {
     @Test
     public void deriveCandidateTriplesTest(){
         try {
-            String example = "Alan Stern";
+            String example = "Igniacio";
             long initTime = System.nanoTime();
             Set<ExampleEntry<String, Triple>> candidateTriples = tripleFinder.deriveCandidateTriples(example, Optional.empty(), 0);
             long endTime = System.nanoTime();
