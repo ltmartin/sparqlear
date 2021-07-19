@@ -24,6 +24,7 @@ import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Component
 @Lazy
@@ -186,9 +187,60 @@ public class QueryLearner {
 
     private BasicGraphPattern constructBasicGraphPattern(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriplePatterns, Map<Boolean, List<Example>> categorizedExamples, int numberOfSelectedVariables) {
         Map<String, List<Triple>> candidateTriplesByDistinguishedVariable = groupCandidateTriplesByDistinguishedVariable(candidateTriplePatterns);
-        // FIXME: Continue here.
-        //Set<Triple> bestTriplePatterns = selectBestTriplePatterns(candidateTriplesByDistinguishedVariable);
+        Set<Triple> bestTriplePatterns = selectBestTriplePatterns(candidateTriplesByDistinguishedVariable, categorizedExamples);
         return null;
+    }
+
+    private Set<Triple> selectBestTriplePatterns(Map<String, List<Triple>> candidateTriplesByDistinguishedVariable, Map<Boolean, List<Example>> categorizedExamples) {
+        Set<Triple> bestTriplePatterns = new HashSet<>();
+
+        Set<String> distinguishedVariablesKeySet = candidateTriplesByDistinguishedVariable.keySet();
+        for (String distinguishedVariable : distinguishedVariablesKeySet) {
+            List<Triple> triplePatterns = candidateTriplesByDistinguishedVariable.get(distinguishedVariable);
+            Double bestInformation = 0.0;
+            Triple bestTriple = null;
+            for (Triple triple : triplePatterns) {
+                BasicGraphPattern bgp = new BasicGraphPattern();
+                bgp.setTriples(Stream.of(triple).collect(Collectors.toCollection(HashSet::new)));
+                calculateInformation(bgp, categorizedExamples);
+                if (bgp.getInformation() > bestInformation){
+                    bestInformation = bgp.getInformation();
+                    bestTriple = triple;
+                }
+            }
+            bestTriplePatterns.add(bestTriple);
+        }
+
+        return bestTriplePatterns;
+    }
+
+    private void calculateInformation(BasicGraphPattern bgp, Map<Boolean, List<Example>> categorizedExamples) {
+        // FIXME: Implement the invoked methods and test this method.
+        /*Set<Triple> bindings = utilsJena.getBindings(bgp);
+        Map<Node, List<Triple>> bindingsGroupedBySubject = bindings.stream().collect(Collectors.groupingBy(Triple::getSubject));
+        Set<Node> subjectKeySet = bindingsGroupedBySubject.keySet();
+        Set<Triple> naturalJoin = new HashSet<>();
+        for (Node subject : subjectKeySet) {
+            Set<Triple> triples = utilsJena.getTriplesWithSubject(subject);
+            naturalJoin.addAll(triples);
+        }
+
+        Set<String> objects = naturalJoin.stream()
+                .map(triple -> {
+                    return triple.getObject().toString();
+                })
+                .collect(Collectors.toSet());
+
+        List<Example> positiveExamples = categorizedExamples.get(Example.CATEGORY_POSITIVE);
+        List<Example> negativeExamples = categorizedExamples.get(Example.CATEGORY_NEGATIVE);
+
+        int positiveExamplesCovered = 0, negativeExamplesCovered = 0;
+        for (String object : objects) {
+            positiveExamplesCovered += positiveExamples.stream().filter(example -> example.getExample().equals(object)).count();
+            negativeExamplesCovered += negativeExamples.stream().filter(example -> example.getExample().equals(object)).count();
+        }
+        double information = positiveExamplesCovered / (positiveExamplesCovered + negativeExamplesCovered);
+        bgp.setInformation(information);*/
     }
 
 
@@ -237,11 +289,6 @@ public class QueryLearner {
         logger.log(Level.INFO, "Candidate triples successfully derived.");
 
         return candidateTriples;
-    }
-
-
-    private double computeInformation(Integer positiveExamplesCovered) {
-        return -(Math.log(((double) positiveExamplesCovered) / parsedExamples.size()) / Math.log(2));
     }
 
 }

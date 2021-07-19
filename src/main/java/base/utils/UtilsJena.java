@@ -74,64 +74,6 @@ public class UtilsJena {
         return UrlValidator.getInstance().isValid(example) ? "<" + example + ">" : "'" + example + "'";
     }
 
-
-    public Map<Boolean, Integer> verifyBasicGraphPattern(Set<Triple> triples, Map<Boolean, List<Example>> categorizedExamples) {
-        Map<Boolean, Integer> results = new HashMap<>();
-        results.put(Example.CATEGORY_POSITIVE, 0);
-        results.put(Example.CATEGORY_NEGATIVE, 0);
-
-        if (null != categorizedExamples.get(Example.CATEGORY_POSITIVE)) {
-            for (Example example : categorizedExamples.get(Example.CATEGORY_POSITIVE)) {
-                String query = constructAskQuery(triples, example);
-                if ((query.contains(example.getExample())) && (runAskQuery(query))) {
-                    Integer value = results.get(Example.CATEGORY_POSITIVE);
-                    results.replace(Example.CATEGORY_POSITIVE, ++value);
-                }
-            }
-        }
-
-        if (null != categorizedExamples.get(Example.CATEGORY_NEGATIVE)) {
-            for (Example example : categorizedExamples.get(Example.CATEGORY_NEGATIVE)) {
-                String query = constructAskQuery(triples, example);
-                if ((query.contains(example.getExample())) && (runAskQuery(query))) {
-                    Integer value = results.get(Example.CATEGORY_NEGATIVE);
-                    results.replace(Example.CATEGORY_NEGATIVE, ++value);
-                }
-            }
-        }
-
-        return results;
-    }
-
-    private String constructAskQuery(Set<Triple> triples, Example example) {
-        StringBuilder stringBuilder = new StringBuilder();
-
-        stringBuilder.append("ASK ");
-        stringBuilder.append("WHERE { ");
-        for (Triple triple : triples) {
-            if (triple.getSubject().toString().contains(SELECTED_VARIABLE_PATTERN)) {
-                String subjectString = triple.getSubject().toString();
-                String selectedVariableIndexString = subjectString.substring(3);
-                if (example.getPosition().equals(Integer.valueOf(selectedVariableIndexString))) {
-                    Node newSubject = NodeFactory.createLiteral(example.getExample());
-                    triple = new Triple(newSubject, triple.getPredicate(), triple.getObject());
-                }
-            } else if (triple.getObject().toString().contains(SELECTED_VARIABLE_PATTERN)) {
-                String objectString = triple.getObject().toString();
-                String selectedVariableIndexString = objectString.substring(3);
-                if (example.getPosition().equals(Integer.valueOf(selectedVariableIndexString))) {
-                    Node newObject = NodeFactory.createLiteral(example.getExample());
-                    triple = new Triple(triple.getSubject(), triple.getPredicate(), newObject);
-                }
-            }
-
-            stringBuilder.append(getSparqlCompatibleTriple(triple)).append(". ");
-        }
-        stringBuilder.append("}");
-
-        return stringBuilder.toString();
-    }
-
     public String getSparqlCompatibleTriple(Triple value) {
         String subject = value.getSubject().toString();
         String predicate = value.getPredicate().toString();
