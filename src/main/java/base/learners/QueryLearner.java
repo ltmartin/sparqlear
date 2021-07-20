@@ -215,9 +215,9 @@ public class QueryLearner {
     }
 
     private void calculateInformation(BasicGraphPattern bgp, Map<Boolean, List<Example>> categorizedExamples) {
+        Set<List<String>> bindings = utilsJena.getBindings(bgp);
         // FIXME: Implement the invoked methods and test this method.
-        /*Set<Triple> bindings = utilsJena.getBindings(bgp);
-        Map<Node, List<Triple>> bindingsGroupedBySubject = bindings.stream().collect(Collectors.groupingBy(Triple::getSubject));
+        /*Map<Node, List<Triple>> bindingsGroupedBySubject = bindings.stream().collect(Collectors.groupingBy(Triple::getSubject));
         Set<Node> subjectKeySet = bindingsGroupedBySubject.keySet();
         Set<Triple> naturalJoin = new HashSet<>();
         for (Node subject : subjectKeySet) {

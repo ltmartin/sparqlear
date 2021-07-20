@@ -1,5 +1,6 @@
 package base.utils;
 
+import base.domain.BasicGraphPattern;
 import base.domain.Example;
 import org.apache.commons.validator.routines.UrlValidator;
 import org.apache.jena.graph.Node;
@@ -149,5 +150,36 @@ public class UtilsJena {
         inputString = inputString.replaceAll("\"", "");
 
         return inputString;
+    }
+
+    public Set<List<String>> getBindings(BasicGraphPattern bgp) {
+        String query = buildSelectQuery(bgp);
+        Set<List<String>> bindings = runQuery(query);
+
+        return bindings;
+    }
+
+    private String buildSelectQuery(BasicGraphPattern bgp){
+        Set<String> variables = new HashSet<>();
+        for (Triple triple : bgp.getTriples()) {
+            variables.add(triple.getSubject().toString());
+            variables.add(triple.getObject().toString());
+        }
+
+        StringBuilder builder = new StringBuilder();
+        builder.append("SELECT ");
+
+        for (String variable : variables) {
+            builder.append(variable + " ");
+        }
+
+        builder.append("WHERE { ");
+        for (Triple triple : bgp.getTriples()) {
+            builder.append(getSparqlCompatibleTriple(triple) + " .");
+        }
+
+        builder.append(" }");
+
+        return builder.toString();
     }
 }
