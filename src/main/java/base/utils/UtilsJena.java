@@ -182,4 +182,23 @@ public class UtilsJena {
 
         return builder.toString();
     }
+
+    public Set<List<String>> getTriplesWithSubject(String subject) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("SELECT * ");
+        builder.append("WHERE { ");
+
+        Triple triple = new Triple(NodeFactory.createURI(subject), NodeFactory.createVariable("p"), NodeFactory.createVariable("o"));
+        builder.append(getSparqlCompatibleTriple(triple) + " .");
+        builder.append(" }");
+        String query = builder.toString();
+
+        return runQuery(query);
+    }
+
+    public static String removeLanguageAnnotation(String annotatedString){
+        if (annotatedString.contains("@"))
+            return annotatedString.substring(0, annotatedString.indexOf("@"));
+        return annotatedString;
+    }
 }

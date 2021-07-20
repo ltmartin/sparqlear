@@ -216,18 +216,17 @@ public class QueryLearner {
 
     private void calculateInformation(BasicGraphPattern bgp, Map<Boolean, List<Example>> categorizedExamples) {
         Set<List<String>> bindings = utilsJena.getBindings(bgp);
-        // FIXME: Implement the invoked methods and test this method.
-        /*Map<Node, List<Triple>> bindingsGroupedBySubject = bindings.stream().collect(Collectors.groupingBy(Triple::getSubject));
-        Set<Node> subjectKeySet = bindingsGroupedBySubject.keySet();
-        Set<Triple> naturalJoin = new HashSet<>();
-        for (Node subject : subjectKeySet) {
-            Set<Triple> triples = utilsJena.getTriplesWithSubject(subject);
+        Set<String> subjects = extractSubjectFromBindings(bindings);
+
+        Set<List<String>> naturalJoin = new HashSet<>();
+        for (String subject : subjects) {
+            Set<List<String>> triples = utilsJena.getTriplesWithSubject(subject);
             naturalJoin.addAll(triples);
         }
 
         Set<String> objects = naturalJoin.stream()
-                .map(triple -> {
-                    return triple.getObject().toString();
+                .map(result -> {
+                    return result.get(1);
                 })
                 .collect(Collectors.toSet());
 
@@ -236,11 +235,23 @@ public class QueryLearner {
 
         int positiveExamplesCovered = 0, negativeExamplesCovered = 0;
         for (String object : objects) {
-            positiveExamplesCovered += positiveExamples.stream().filter(example -> example.getExample().equals(object)).count();
-            negativeExamplesCovered += negativeExamples.stream().filter(example -> example.getExample().equals(object)).count();
+            System.out.println(object);
+            positiveExamplesCovered += positiveExamples.stream().filter(example -> example.getExample().contains(UtilsJena.removeLanguageAnnotation(object))).count();
+            if (null != negativeExamples)
+                negativeExamplesCovered += negativeExamples.stream().filter(example -> example.getExample().contains(UtilsJena.removeLanguageAnnotation(object))).count();
         }
         double information = positiveExamplesCovered / (positiveExamplesCovered + negativeExamplesCovered);
-        bgp.setInformation(information);*/
+        bgp.setInformation(information);
+    }
+
+    private Set<String> extractSubjectFromBindings(Set<List<String>> bindings) {
+        Set<String> subjects = new HashSet<>();
+
+        for (List<String> results : bindings) {
+            subjects.add(results.get(1));
+        }
+
+        return subjects;
     }
 
 

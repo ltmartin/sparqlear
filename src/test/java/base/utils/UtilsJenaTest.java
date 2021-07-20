@@ -4,10 +4,12 @@ import base.Application;
 import base.domain.BasicGraphPattern;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.util.Assert;
 
 import java.io.IOException;
 import java.util.Optional;
@@ -39,5 +41,18 @@ class UtilsJenaTest {
         Triple triple1 = new Triple(NodeFactory.createVariable("x1"), NodeFactory.createURI("http://dbpedia.org/property/citizenship"), NodeFactory.createVariable("citizenship"));
         bgp.setTriples(Stream.of(triple1).collect(Collectors.toSet()));
         utilsJena.getBindings(bgp);
+    }
+
+    @Test
+    void getTriplesWithSubject() {
+        String subject = "http://dbpedia.org/resource/Paul_Demiéville";
+        utilsJena.getTriplesWithSubject(subject);
+    }
+
+    @Test
+    void removeLanguageAnnotation() {
+        String annotatedString = "Pepe@es";
+        String simpleString = UtilsJena.removeLanguageAnnotation(annotatedString);
+        Assertions.assertEquals("Pepe", simpleString);
     }
 }
