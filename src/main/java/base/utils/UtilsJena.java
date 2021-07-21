@@ -149,18 +149,17 @@ public class UtilsJena {
         return inputString;
     }
 
-    public Set<List<String>> getBindings(BasicGraphPattern bgp) {
-        String query = buildSelectQuery(bgp);
+    public Set<List<String>> getSubjectBindings(BasicGraphPattern bgp) {
+        String query = buildSubjectSelectQuery(bgp);
         Set<List<String>> bindings = runQuery(query);
 
         return bindings;
     }
 
-    private String buildSelectQuery(BasicGraphPattern bgp){
+    private String buildSubjectSelectQuery(BasicGraphPattern bgp){
         Set<String> variables = new HashSet<>();
         for (Triple triple : bgp.getTriplePatterns()) {
             variables.add(triple.getSubject().toString());
-            variables.add(triple.getObject().toString());
         }
 
         StringBuilder builder = new StringBuilder();

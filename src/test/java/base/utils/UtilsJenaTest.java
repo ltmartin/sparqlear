@@ -39,7 +39,7 @@ class UtilsJenaTest {
         BasicGraphPattern bgp = new BasicGraphPattern();
         Triple triple1 = new Triple(NodeFactory.createVariable("x1"), NodeFactory.createURI("http://dbpedia.org/property/citizenship"), NodeFactory.createVariable("citizenship"));
         bgp.setTriplePatterns(Stream.of(triple1).collect(Collectors.toSet()));
-        utilsJena.getBindings(bgp);
+        utilsJena.getSubjectBindings(bgp);
     }
 
     @Test

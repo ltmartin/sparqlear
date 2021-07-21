@@ -215,8 +215,8 @@ public class QueryLearner {
     }
 
     private void calculateInformation(BasicGraphPattern bgp, Map<Boolean, List<Example>> categorizedExamples) {
-        Set<List<String>> bindings = utilsJena.getBindings(bgp);
-        Set<String> subjects = extractSubjectFromBindings(bindings);
+        Set<List<String>> subjectBindings = utilsJena.getSubjectBindings(bgp);
+        Set<String> subjects = extractSubjectFromBindings(subjectBindings);
 
         Set<List<String>> naturalJoin = new HashSet<>();
         for (String subject : subjects) {
@@ -248,7 +248,7 @@ public class QueryLearner {
         Set<String> subjects = new HashSet<>();
 
         for (List<String> results : bindings) {
-            subjects.add(results.get(1));
+            subjects.add(results.get(0));
         }
 
         return subjects;
