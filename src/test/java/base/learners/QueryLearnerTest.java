@@ -59,7 +59,6 @@ class QueryLearnerTest {
 
     @Test
     void positiveMultipleVariableExamples() {
-        // FIXME: Fix these examples
         String examples = "+(Igniacio, 1908-10-03) +(Rafi, 1903-07-01)";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
@@ -78,8 +77,7 @@ class QueryLearnerTest {
 
     @Test
     void positiveAndNegativeMultipleVariableExamples() {
-        // FIXME: Fix these examples
-        String examples = "+<Fidel, Cuba, male> +<Leonardo, Italy, male> -<blue, plane, tree>";
+        String examples = "+(Igniacio, 1908-10-03) +(Rafi, 1903-07-01) -(plane, albert)";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");

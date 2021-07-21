@@ -1,9 +1,7 @@
 package base.utils;
 
 import base.domain.BasicGraphPattern;
-import base.domain.Example;
 import org.apache.commons.validator.routines.UrlValidator;
-import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
 import org.apache.jena.query.*;
@@ -14,7 +12,6 @@ import org.springframework.stereotype.Component;
 import javax.annotation.Resource;
 import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -161,7 +158,7 @@ public class UtilsJena {
 
     private String buildSelectQuery(BasicGraphPattern bgp){
         Set<String> variables = new HashSet<>();
-        for (Triple triple : bgp.getTriples()) {
+        for (Triple triple : bgp.getTriplePatterns()) {
             variables.add(triple.getSubject().toString());
             variables.add(triple.getObject().toString());
         }
@@ -174,7 +171,7 @@ public class UtilsJena {
         }
 
         builder.append("WHERE { ");
-        for (Triple triple : bgp.getTriples()) {
+        for (Triple triple : bgp.getTriplePatterns()) {
             builder.append(getSparqlCompatibleTriple(triple) + " .");
         }
 

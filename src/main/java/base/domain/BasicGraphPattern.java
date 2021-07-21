@@ -6,20 +6,22 @@ import java.util.HashSet;
 import java.util.Set;
 
 public class BasicGraphPattern {
-    private Set<Triple> triples;
+    private Set<Triple> triplePatterns;
     private double information;
+    private double coverage;
 
     public BasicGraphPattern() {
-        triples = new HashSet<>();
+        triplePatterns = new HashSet<>();
         information = 0.0;
+        coverage = 0.0;
     }
 
-    public Set<Triple> getTriples() {
-        return triples;
+    public Set<Triple> getTriplePatterns() {
+        return triplePatterns;
     }
 
-    public void setTriples(Set<Triple> triples) {
-        this.triples = triples;
+    public void setTriplePatterns(Set<Triple> triplePatterns) {
+        this.triplePatterns = triplePatterns;
     }
 
     public double getInformation() {
@@ -28,5 +30,13 @@ public class BasicGraphPattern {
 
     public void setInformation(double information) {
         this.information = information;
+    }
+
+    public double getCoverage() {
+        return coverage;
+    }
+
+    public void setCoverage(double coverage) {
+        this.coverage = coverage;
     }
 }

@@ -9,7 +9,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.util.Assert;
 
 import java.io.IOException;
 import java.util.Optional;
@@ -39,7 +38,7 @@ class UtilsJenaTest {
     void getBindings() {
         BasicGraphPattern bgp = new BasicGraphPattern();
         Triple triple1 = new Triple(NodeFactory.createVariable("x1"), NodeFactory.createURI("http://dbpedia.org/property/citizenship"), NodeFactory.createVariable("citizenship"));
-        bgp.setTriples(Stream.of(triple1).collect(Collectors.toSet()));
+        bgp.setTriplePatterns(Stream.of(triple1).collect(Collectors.toSet()));
         utilsJena.getBindings(bgp);
     }
 

@@ -5,8 +5,6 @@ import base.domain.Example;
 import base.domain.ExampleEntry;
 import base.domain.Motif;
 import base.services.MotifsService;
-import base.services.PropertiesService;
-import base.utils.CombinationsUtil;
 import base.utils.DatasetsParser;
 import base.utils.ExampleUtils;
 import base.utils.UtilsJena;
@@ -53,7 +51,6 @@ public class QueryLearner {
     @Value("${sparqlear.learnMultipleQueries}")
     private Boolean learnMultipleQueries;
 
-    private int selectedVariablesAmount;
     private Map<String, List<Triple>> triplesBySelectedVariable = new HashMap<>();
     private Map<String, Node> variableNames = new HashMap<>();
     private int svIndex = 0, nsvIndex = 0;
@@ -164,7 +161,7 @@ public class QueryLearner {
         stringBuilder.append("SELECT DISTINCT ");
 
         Set<String> selectedVariables = new HashSet<>();
-        for (Triple triple : bgp.getTriples()) {
+        for (Triple triple : bgp.getTriplePatterns()) {
             if (triple.getSubject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
                 selectedVariables.add(triple.getSubject().toString());
             if (triple.getObject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
@@ -177,7 +174,7 @@ public class QueryLearner {
         }
 
         stringBuilder.append("WHERE { ");
-        for (Triple triple : bgp.getTriples()) {
+        for (Triple triple : bgp.getTriplePatterns()) {
             stringBuilder.append(utilsJena.getSparqlCompatibleTriple(triple)).append(" . ");
         }
         stringBuilder.append("}");
@@ -188,6 +185,9 @@ public class QueryLearner {
     private BasicGraphPattern constructBasicGraphPattern(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriplePatterns, Map<Boolean, List<Example>> categorizedExamples, int numberOfSelectedVariables) {
         Map<String, List<Triple>> candidateTriplesByDistinguishedVariable = groupCandidateTriplesByDistinguishedVariable(candidateTriplePatterns);
         Set<Triple> bestTriplePatterns = selectBestTriplePatterns(candidateTriplesByDistinguishedVariable, categorizedExamples);
+        BasicGraphPattern cbgp = new BasicGraphPattern();
+        cbgp.setTriplePatterns(bestTriplePatterns);
+        calculateInformation(cbgp, categorizedExamples);
         return null;
     }
 
@@ -201,7 +201,7 @@ public class QueryLearner {
             Triple bestTriple = null;
             for (Triple triple : triplePatterns) {
                 BasicGraphPattern bgp = new BasicGraphPattern();
-                bgp.setTriples(Stream.of(triple).collect(Collectors.toCollection(HashSet::new)));
+                bgp.setTriplePatterns(Stream.of(triple).collect(Collectors.toCollection(HashSet::new)));
                 calculateInformation(bgp, categorizedExamples);
                 if (bgp.getInformation() > bestInformation){
                     bestInformation = bgp.getInformation();
@@ -235,12 +235,12 @@ public class QueryLearner {
 
         int positiveExamplesCovered = 0, negativeExamplesCovered = 0;
         for (String object : objects) {
-            System.out.println(object);
-            positiveExamplesCovered += positiveExamples.stream().filter(example -> example.getExample().contains(UtilsJena.removeLanguageAnnotation(object))).count();
-            if (null != negativeExamples)
+            if (positiveExamplesCovered < positiveExamples.size())
+                positiveExamplesCovered += positiveExamples.stream().filter(example -> example.getExample().contains(UtilsJena.removeLanguageAnnotation(object))).count();
+            if ((null != negativeExamples) && (negativeExamplesCovered < negativeExamples.size()))
                 negativeExamplesCovered += negativeExamples.stream().filter(example -> example.getExample().contains(UtilsJena.removeLanguageAnnotation(object))).count();
         }
-        double information = positiveExamplesCovered / (positiveExamplesCovered + negativeExamplesCovered);
+        double information = (double) positiveExamplesCovered / (positiveExamplesCovered + negativeExamplesCovered);
         bgp.setInformation(information);
     }
 
