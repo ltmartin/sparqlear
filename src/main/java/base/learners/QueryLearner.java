@@ -100,7 +100,7 @@ public class QueryLearner {
                 introduceVariables(candidateTriples.get(example), parsedExamples, triplesBySelectedVariable, example.getPosition());
             }
 
-            BasicGraphPattern bgp = constructBasicGraphPattern(candidateTriples, categorizedExamples, positiveExamplesByComponent.size());
+            BasicGraphPattern bgp = constructBasicGraphPattern(candidateTriples, categorizedExamples, candidateMotifInstances);
             if (null != bgp)
                 derivedQueries.add(buildQuery(bgp));
         } else {
@@ -182,14 +182,43 @@ public class QueryLearner {
         return stringBuilder.toString();
     }
 
-    private BasicGraphPattern constructBasicGraphPattern(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriplePatterns, Map<Boolean, List<Example>> categorizedExamples, int numberOfSelectedVariables) {
+    private BasicGraphPattern constructBasicGraphPattern(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriplePatterns, Map<Boolean, List<Example>> categorizedExamples, Set<Motif> candidateMotifInstances) {
+        BasicGraphPattern bgp = new BasicGraphPattern();
         Map<String, List<Triple>> candidateTriplesByDistinguishedVariable = groupCandidateTriplesByDistinguishedVariable(candidateTriplePatterns);
         Set<Triple> bestTriplePatterns = selectBestTriplePatterns(candidateTriplesByDistinguishedVariable, categorizedExamples);
         BasicGraphPattern cbgp = new BasicGraphPattern();
         cbgp.setTriplePatterns(bestTriplePatterns);
         calculateInformation(cbgp, categorizedExamples);
-        return null;
+        /*
+        for (Motif motifInstance : candidateMotifInstances) {
+            cbgp = tryMotifInstance(motifInstance, cbgp);
+        }*/
+
+        return bgp;
     }
+
+    private BasicGraphPattern tryMotifInstance(Motif motifInstance, BasicGraphPattern cbgp) {
+        Set<base.domain.Triple> motifTriples = motifInstance.getTriples();
+        for (base.domain.Triple triple : motifTriples) {
+            String subject = triple.getSubject();
+            String object =  triple.getObject();
+
+            // creating a variable for the subject of the triple
+            if (!variableNames.containsKey(subject)){
+                Node newSubjectNode = NodeFactory.createVariable("x" + nsvIndex++);
+                variableNames.put(subject, newSubjectNode);
+            }
+
+            // creating a variable for the object of the triple
+            if (!variableNames.containsKey(object)){
+                Node newObjectNode = NodeFactory.createVariable("x" + nsvIndex++);
+                variableNames.put(subject, newObjectNode);
+            }
+        }
+        // TODO: CONTINUE HERE.
+        return cbgp;
+    }
+
 
     private Set<Triple> selectBestTriplePatterns(Map<String, List<Triple>> candidateTriplesByDistinguishedVariable, Map<Boolean, List<Example>> categorizedExamples) {
         Set<Triple> bestTriplePatterns = new HashSet<>();
@@ -219,9 +248,13 @@ public class QueryLearner {
         Set<String> subjects = extractSubjectFromBindings(subjectBindings);
 
         Set<List<String>> naturalJoin = new HashSet<>();
-        for (String subject : subjects) {
-            Set<List<String>> triples = utilsJena.getTriplesWithSubject(subject);
-            naturalJoin.addAll(triples);
+        for (Map.Entry<String, Node> entry : variableNames.entrySet()) {
+            // checking if the subject binding corresponds to one of the subjects from the examples. If so, we keep it.
+            String possibleSubject = entry.getKey();
+            if (subjects.contains(possibleSubject)){
+                Set<List<String>> triples = utilsJena.getTriplesWithSubject(possibleSubject);
+                naturalJoin.addAll(triples);
+            }
         }
 
         Set<String> objects = naturalJoin.stream()
@@ -236,9 +269,9 @@ public class QueryLearner {
         int positiveExamplesCovered = 0, negativeExamplesCovered = 0;
         for (String object : objects) {
             if (positiveExamplesCovered < positiveExamples.size())
-                positiveExamplesCovered += positiveExamples.stream().filter(example -> example.getExample().contains(UtilsJena.removeLanguageAnnotation(object))).count();
+                positiveExamplesCovered += positiveExamples.stream().filter(example -> object.contains(example.getExample())).count();
             if ((null != negativeExamples) && (negativeExamplesCovered < negativeExamples.size()))
-                negativeExamplesCovered += negativeExamples.stream().filter(example -> example.getExample().contains(UtilsJena.removeLanguageAnnotation(object))).count();
+                negativeExamplesCovered += negativeExamples.stream().filter(example -> object.contains(example.getExample())).count();
         }
         double information = (double) positiveExamplesCovered / (positiveExamplesCovered + negativeExamplesCovered);
         bgp.setInformation(information);
