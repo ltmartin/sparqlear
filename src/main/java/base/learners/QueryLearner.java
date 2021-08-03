@@ -55,6 +55,7 @@ public class QueryLearner {
     private Map<String, Node> variableNames = new HashMap<>();
     private int svIndex = 0, nsvIndex = 0;
     private Set<Example> parsedExamples;
+    private Map<String, List<String>> trainingSet = new HashMap<>();
 
     public Optional<Set<String>> learn(String examples) throws ParseException, IOException {
         Set<String> derivedQueries = new HashSet<>();
@@ -63,6 +64,8 @@ public class QueryLearner {
         logger.log(Level.INFO, "Parsing examples...");
         parsedExamples = exampleUtils.parseExamples(examples);
         logger.log(Level.INFO, "Examples parsed.");
+
+        createTrainingSet(parsedExamples);
 
         if (!datasets.isEmpty()) {
             logger.log(Level.INFO, "Parsing datasets...");
@@ -107,6 +110,21 @@ public class QueryLearner {
             // TODO: Create the flow for learning from multiple datasets.
         }
         return Optional.of(derivedQueries);
+    }
+
+    private void createTrainingSet(Set<Example> parsedExamples) {
+        for (Example example : parsedExamples) {
+            int distinguishedVariableIndex = example.getPosition();
+            String distinguishedVariable = UtilsJena.SELECTED_VARIABLE_PATTERN + distinguishedVariableIndex;
+            if (!trainingSet.containsKey(distinguishedVariable)){
+                List<String> bindings = Stream.of(example.getExample()).collect(Collectors.toList());
+                trainingSet.put(distinguishedVariable, bindings);
+            } else {
+                List<String> bindings = trainingSet.get(distinguishedVariable);
+                bindings.add(example.getExample());
+                trainingSet.replace(distinguishedVariable, bindings);
+            }
+        }
     }
 
     private void introduceVariables(Set<ExampleEntry<String, Triple>> componentCandidateTriples, Set<Example> parsedExamples, Map<String, List<Triple>> triplesBySelectedVariable, Integer componentIndex) {
@@ -189,10 +207,10 @@ public class QueryLearner {
         BasicGraphPattern cbgp = new BasicGraphPattern();
         cbgp.setTriplePatterns(bestTriplePatterns);
         calculateInformation(cbgp, categorizedExamples);
-        /*
+
         for (Motif motifInstance : candidateMotifInstances) {
             cbgp = tryMotifInstance(motifInstance, cbgp);
-        }*/
+        }
 
         return bgp;
     }
