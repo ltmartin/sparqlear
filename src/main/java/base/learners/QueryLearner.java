@@ -1,9 +1,6 @@
 package base.learners;
 
-import base.domain.BasicGraphPattern;
-import base.domain.Example;
-import base.domain.ExampleEntry;
-import base.domain.Motif;
+import base.domain.*;
 import base.services.MotifsService;
 import base.utils.DatasetsParser;
 import base.utils.ExampleUtils;
@@ -55,7 +52,7 @@ public class QueryLearner {
     private Map<String, Node> variableNames = new HashMap<>();
     private int svIndex = 0, nsvIndex = 0;
     private Set<Example> parsedExamples;
-    private Map<String, List<String>> trainingSet = new HashMap<>();
+    private List<ExampleBindings> trainingSet = new LinkedList();
 
     public Optional<Set<String>> learn(String examples) throws ParseException, IOException {
         Set<String> derivedQueries = new HashSet<>();
@@ -113,17 +110,17 @@ public class QueryLearner {
     }
 
     private void createTrainingSet(Set<Example> parsedExamples) {
-        for (Example example : parsedExamples) {
-            int distinguishedVariableIndex = example.getPosition();
-            String distinguishedVariable = UtilsJena.SELECTED_VARIABLE_PATTERN + distinguishedVariableIndex;
-            if (!trainingSet.containsKey(distinguishedVariable)){
-                List<String> bindings = Stream.of(example.getExample()).collect(Collectors.toList());
-                trainingSet.put(distinguishedVariable, bindings);
-            } else {
-                List<String> bindings = trainingSet.get(distinguishedVariable);
-                bindings.add(example.getExample());
-                trainingSet.replace(distinguishedVariable, bindings);
+        Map<Integer, List<Example>> examplesByGroup = parsedExamples.stream().collect(Collectors.groupingBy(Example::getGroup));
+
+        for (Map.Entry<Integer, List<Example>> entry : examplesByGroup.entrySet()) {
+            ExampleBindings bindings = new ExampleBindings();
+            List<Example> examples = entry.getValue();
+            bindings.setCategory(examples.get(0).getCategory());
+            for (Example example : examples) {
+                String distinguishedVariable = UtilsJena.SELECTED_VARIABLE_PATTERN + example.getPosition();
+                bindings.getBindings().put(distinguishedVariable, example.getExample());
             }
+            trainingSet.add(bindings);
         }
     }
 
