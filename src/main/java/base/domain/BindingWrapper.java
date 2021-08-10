@@ -3,14 +3,19 @@ package base.domain;
 import java.util.HashMap;
 import java.util.Map;
 
-public class ExampleBindings {
+public class BindingWrapper {
     // Positive or Negative
     private Boolean category;
     // Pairs <variable, binding>
     private Map<String, String> bindings;
 
-    public ExampleBindings() {
+    public BindingWrapper() {
         bindings = new HashMap<>();
+    }
+
+    public BindingWrapper(Boolean category, Map<String, String> bindings) {
+        this.category = category;
+        this.bindings = bindings;
     }
 
     public Boolean getCategory() {

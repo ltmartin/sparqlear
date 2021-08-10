@@ -5,6 +5,7 @@ import base.services.MotifsService;
 import base.utils.DatasetsParser;
 import base.utils.ExampleUtils;
 import base.utils.UtilsJena;
+import org.apache.commons.lang3.SerializationUtils;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
@@ -52,7 +53,7 @@ public class QueryLearner {
     private Map<String, Node> variableNames = new HashMap<>();
     private int svIndex = 0, nsvIndex = 0;
     private Set<Example> parsedExamples;
-    private List<ExampleBindings> trainingSet = new LinkedList();
+    private LinkedList<BindingWrapper> trainingSet = new LinkedList();
 
     public Optional<Set<String>> learn(String examples) throws ParseException, IOException {
         Set<String> derivedQueries = new HashSet<>();
@@ -62,6 +63,7 @@ public class QueryLearner {
         parsedExamples = exampleUtils.parseExamples(examples);
         logger.log(Level.INFO, "Examples parsed.");
 
+        // Creating the training set with the bindings.
         createTrainingSet(parsedExamples);
 
         if (!datasets.isEmpty()) {
@@ -113,11 +115,11 @@ public class QueryLearner {
         Map<Integer, List<Example>> examplesByGroup = parsedExamples.stream().collect(Collectors.groupingBy(Example::getGroup));
 
         for (Map.Entry<Integer, List<Example>> entry : examplesByGroup.entrySet()) {
-            ExampleBindings bindings = new ExampleBindings();
+            BindingWrapper bindings = new BindingWrapper();
             List<Example> examples = entry.getValue();
             bindings.setCategory(examples.get(0).getCategory());
             for (Example example : examples) {
-                String distinguishedVariable = UtilsJena.SELECTED_VARIABLE_PATTERN + example.getPosition();
+                String distinguishedVariable = "?" + UtilsJena.SELECTED_VARIABLE_PATTERN + example.getPosition();
                 bindings.getBindings().put(distinguishedVariable, example.getExample());
             }
             trainingSet.add(bindings);
@@ -200,16 +202,29 @@ public class QueryLearner {
     private BasicGraphPattern constructBasicGraphPattern(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriplePatterns, Map<Boolean, List<Example>> categorizedExamples, Set<Motif> candidateMotifInstances) {
         BasicGraphPattern bgp = new BasicGraphPattern();
         Map<String, List<Triple>> candidateTriplesByDistinguishedVariable = groupCandidateTriplesByDistinguishedVariable(candidateTriplePatterns);
-        Set<Triple> bestTriplePatterns = selectBestTriplePatterns(candidateTriplesByDistinguishedVariable, categorizedExamples);
+
+        // Creating a copy of the training set, so we can return to the original one.
+        LinkedList<BindingWrapper> temporaryTrainingSet = new LinkedList<>();
+        createDeepCopy(trainingSet, temporaryTrainingSet);
+
+        Set<Triple> bestTriplePatterns = selectBestTriplePatterns(candidateTriplesByDistinguishedVariable, categorizedExamples, temporaryTrainingSet);
+
         BasicGraphPattern cbgp = new BasicGraphPattern();
         cbgp.setTriplePatterns(bestTriplePatterns);
-        calculateInformation(cbgp, categorizedExamples);
+        calculateInformation(cbgp, categorizedExamples, temporaryTrainingSet);
 
         for (Motif motifInstance : candidateMotifInstances) {
             cbgp = tryMotifInstance(motifInstance, cbgp);
         }
 
         return bgp;
+    }
+
+    // This method is necessary to avoid the default Java copy-by-reference behaviour.
+    private void createDeepCopy(List<BindingWrapper> trainingSet, LinkedList<BindingWrapper> temporaryTrainingSet) {
+        for (BindingWrapper item : trainingSet) {
+            temporaryTrainingSet.add(new BindingWrapper(item.getCategory(), SerializationUtils.clone((HashMap)item.getBindings())));
+        }
     }
 
     private BasicGraphPattern tryMotifInstance(Motif motifInstance, BasicGraphPattern cbgp) {
@@ -235,7 +250,7 @@ public class QueryLearner {
     }
 
 
-    private Set<Triple> selectBestTriplePatterns(Map<String, List<Triple>> candidateTriplesByDistinguishedVariable, Map<Boolean, List<Example>> categorizedExamples) {
+    private Set<Triple> selectBestTriplePatterns(Map<String, List<Triple>> candidateTriplesByDistinguishedVariable, Map<Boolean, List<Example>> categorizedExamples, List<BindingWrapper> temporaryTrainingSet) {
         Set<Triple> bestTriplePatterns = new HashSet<>();
 
         Set<String> distinguishedVariablesKeySet = candidateTriplesByDistinguishedVariable.keySet();
@@ -246,7 +261,7 @@ public class QueryLearner {
             for (Triple triple : triplePatterns) {
                 BasicGraphPattern bgp = new BasicGraphPattern();
                 bgp.setTriplePatterns(Stream.of(triple).collect(Collectors.toCollection(HashSet::new)));
-                calculateInformation(bgp, categorizedExamples);
+                calculateInformation(bgp, categorizedExamples, temporaryTrainingSet);
                 if (bgp.getInformation() > bestInformation){
                     bestInformation = bgp.getInformation();
                     bestTriple = triple;
@@ -258,49 +273,65 @@ public class QueryLearner {
         return bestTriplePatterns;
     }
 
-    private void calculateInformation(BasicGraphPattern bgp, Map<Boolean, List<Example>> categorizedExamples) {
-        Set<List<String>> subjectBindings = utilsJena.getSubjectBindings(bgp);
-        Set<String> subjects = extractSubjectFromBindings(subjectBindings);
+    private void calculateInformation(BasicGraphPattern bgp, Map<Boolean, List<Example>> categorizedExamples, List<BindingWrapper> temporaryTrainingSet) {
+        // Obtaining the bindings of the BGP
+        Map<String, List<String>> bindings = utilsJena.getBindings(bgp);
 
-        Set<List<String>> naturalJoin = new HashSet<>();
-        for (Map.Entry<String, Node> entry : variableNames.entrySet()) {
-            // checking if the subject binding corresponds to one of the subjects from the examples. If so, we keep it.
-            String possibleSubject = entry.getKey();
-            if (subjects.contains(possibleSubject)){
-                Set<List<String>> triples = utilsJena.getTriplesWithSubject(possibleSubject);
-                naturalJoin.addAll(triples);
+        // Joining the training set with the bindings coming from the BGP
+        for (int j = 0; j < temporaryTrainingSet.size(); j++) {
+            BindingWrapper exampleBinding = temporaryTrainingSet.get(j);
+            Set<String> keySet = exampleBinding.getBindings().keySet();
+            Set<String> distinguishedVariableKeys = keySet.stream().filter(key -> key.contains(UtilsJena.SELECTED_VARIABLE_PATTERN)).collect(Collectors.toSet());
+            for (String key : distinguishedVariableKeys) {
+                String bindingInTrainingSet = exampleBinding.getBindings().get(key);
+                List<String> bgpBindingsInstances = bindings.get(key);
+                if (null != bgpBindingsInstances) {
+                    boolean bindingInTrainingSetFound = false;
+                    for (int i = 0; i < bgpBindingsInstances.size(); i++) {
+                        if (bgpBindingsInstances.get(i).contains(bindingInTrainingSet)) {
+                            bindingInTrainingSetFound = true;
+                            Map<String, String> bindingsInTrainingSet = exampleBinding.getBindings();
+                            Set<String> bindingsKeys = bindings.keySet();
+                            for (String bindingKey : bindingsKeys) {
+                                if (!bindingsInTrainingSet.containsKey(bindingKey))
+                                    bindingsInTrainingSet.put(bindingKey, bindings.get(bindingKey).get(i));
+                            }
+                            exampleBinding.setBindings(bindingsInTrainingSet);
+                        }
+                    }
+                    if (!bindingInTrainingSetFound)
+                        temporaryTrainingSet.remove(exampleBinding);
+                }
             }
         }
 
-        Set<String> objects = naturalJoin.stream()
-                .map(result -> {
-                    return result.get(1);
-                })
-                .collect(Collectors.toSet());
+        Set<String> distinguishedVariablesInBgp = new HashSet<>();
+        bgp.getTriplePatterns().stream().forEach(triplePattern -> {
+            if (triplePattern.getObject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+                distinguishedVariablesInBgp.add(triplePattern.getObject().toString());
+        });
 
         List<Example> positiveExamples = categorizedExamples.get(Example.CATEGORY_POSITIVE);
         List<Example> negativeExamples = categorizedExamples.get(Example.CATEGORY_NEGATIVE);
 
         int positiveExamplesCovered = 0, negativeExamplesCovered = 0;
-        for (String object : objects) {
-            if (positiveExamplesCovered < positiveExamples.size())
-                positiveExamplesCovered += positiveExamples.stream().filter(example -> object.contains(example.getExample())).count();
-            if ((null != negativeExamples) && (negativeExamplesCovered < negativeExamples.size()))
-                negativeExamplesCovered += negativeExamples.stream().filter(example -> object.contains(example.getExample())).count();
+        List<String> distinguishedVariableBindingInstances = new LinkedList<>();
+        for (BindingWrapper bindingWrapper : temporaryTrainingSet) {
+            distinguishedVariablesInBgp.stream().forEach(dv -> {
+                if (bindingWrapper.getBindings().containsKey(dv))
+                    distinguishedVariableBindingInstances.add(bindingWrapper.getBindings().get(dv));
+            });
         }
+
+        if (positiveExamplesCovered < positiveExamples.size())
+            positiveExamplesCovered += positiveExamples.stream().filter(example -> distinguishedVariableBindingInstances.contains(example.getExample())).count();
+        if ((null != negativeExamples) && (negativeExamplesCovered < negativeExamples.size()))
+            negativeExamplesCovered += negativeExamples.stream().filter(example -> distinguishedVariableBindingInstances.contains(example.getExample())).count();
+
         double information = (double) positiveExamplesCovered / (positiveExamplesCovered + negativeExamplesCovered);
         bgp.setInformation(information);
     }
 
-    private Set<String> extractSubjectFromBindings(Set<List<String>> bindings) {
-        Set<String> subjects = new HashSet<>();
-
-        for (List<String> results : bindings) {
-            subjects.add(results.get(0));
-        }
-
-        return subjects;
-    }
 
 
     private Map<String, List<Triple>> groupCandidateTriplesByDistinguishedVariable(Map<Example, Set<ExampleEntry<String, Triple>>> candidateTriples) {

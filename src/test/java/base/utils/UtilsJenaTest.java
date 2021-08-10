@@ -45,7 +45,7 @@ class UtilsJenaTest {
     @Test
     void getTriplesWithSubject() {
         String subject = "http://dbpedia.org/resource/Paul_Demiéville";
-        utilsJena.getTriplesWithSubject(subject);
+        utilsJena.getObjectsOfTriplesWithSubject(subject);
     }
 
     @Test

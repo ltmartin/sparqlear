@@ -5,6 +5,8 @@ import org.apache.commons.validator.routines.UrlValidator;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
 import org.apache.jena.query.*;
+import org.apache.jena.sparql.core.Var;
+import org.apache.jena.sparql.engine.binding.Binding;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
@@ -15,6 +17,8 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * @author Leandro Tabares Martín
@@ -150,16 +154,53 @@ public class UtilsJena {
     }
 
     public Set<List<String>> getSubjectBindings(BasicGraphPattern bgp) {
-        String query = buildSubjectSelectQuery(bgp);
+        String query = buildSelectQuery(bgp);
         Set<List<String>> bindings = runQuery(query);
 
         return bindings;
     }
 
-    private String buildSubjectSelectQuery(BasicGraphPattern bgp){
+    public Map<String, List<String>> getBindings(BasicGraphPattern bgp){
+        String query = buildSelectQuery(bgp);
+
+        Map<String, List<String>> results = new HashMap<>();
+
+        try (QueryExecution qexec = QueryExecutionFactory.sparqlService(endpoint, query)) {
+            qexec.setTimeout(timeout, TimeUnit.MINUTES);
+            ResultSet rs = qexec.execSelect();
+            while (rs.hasNext()) {
+                Binding binding = rs.nextBinding();
+                Iterator<Var> varIterator = binding.vars();
+                while (varIterator.hasNext()){
+                    Var variable = varIterator.next();
+                    if (!results.containsKey(variable.toString())){
+                        String variableBinding = binding.get(variable).toString();
+                        results.put(variable.toString(), Stream.of(variableBinding).collect(Collectors.toList()));
+                    } else {
+                        List<String> variableBindings = results.get(variable.toString());
+                        variableBindings.add(binding.get(variable).toString());
+                        results.replace(variable.toString(), variableBindings);
+                    }
+                }
+            }
+        } catch (QueryParseException e) {
+            System.out.println("===============================================");
+            logger.log(Level.SEVERE, "Error processing the bindings of the query: \n" + query + "\n");
+            System.out.println("===============================================");
+        } catch (Exception e) {
+            System.out.println("===============================================");
+            logger.log(Level.SEVERE, "It has occurred an external error processing the bindings of the query: \n" + query + "\n");
+            System.out.println("===============================================");
+        }
+
+        return results;
+    }
+
+    private String buildSelectQuery(BasicGraphPattern bgp){
         Set<String> variables = new HashSet<>();
         for (Triple triple : bgp.getTriplePatterns()) {
             variables.add(triple.getSubject().toString());
+            variables.add(triple.getObject().toString());
         }
 
         StringBuilder builder = new StringBuilder();
@@ -179,9 +220,9 @@ public class UtilsJena {
         return builder.toString();
     }
 
-    public Set<List<String>> getTriplesWithSubject(String subject) {
+    public Set<List<String>> getObjectsOfTriplesWithSubject(String subject) {
         StringBuilder builder = new StringBuilder();
-        builder.append("SELECT * ");
+        builder.append("SELECT ?o ");
         builder.append("WHERE { ");
 
         Triple triple = new Triple(NodeFactory.createURI(subject), NodeFactory.createVariable("p"), NodeFactory.createVariable("o"));
