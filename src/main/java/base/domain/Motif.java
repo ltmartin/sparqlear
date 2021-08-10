@@ -1,5 +1,7 @@
 package base.domain;
 
+import org.springframework.context.annotation.Lazy;
+
 import javax.persistence.*;
 import java.util.HashSet;
 import java.util.Set;

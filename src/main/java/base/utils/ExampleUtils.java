@@ -1,6 +1,6 @@
 package base.utils;
 
-import base.domain.Example;
+import base.domain.ExampleWrapper;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
@@ -11,8 +11,8 @@ import java.util.*;
 @Lazy
 public class ExampleUtils {
 
-    public Set<Example> parseExamples(String examples) throws ParseException {
-        Set<Example> parsedExamples = new HashSet<>();
+    public Set<ExampleWrapper> parseExamples(String examples) throws ParseException {
+        Set<ExampleWrapper> parsedExampleWrappers = new HashSet<>();
         if (checkStructure(examples)){
             boolean groupedExamples = examples.contains("(");
             Set<String> splittedStringExamples = new LinkedHashSet<>();
@@ -23,9 +23,9 @@ public class ExampleUtils {
                 for (String e : splittedStringExamples) {
                     boolean positive = e.charAt(0) == '+';
                     if (positive)
-                        parsedExamples.add(new Example(groupId++, e.substring(1), Example.CATEGORY_POSITIVE, 0));
+                        parsedExampleWrappers.add(new ExampleWrapper(groupId++, e.substring(1), ExampleWrapper.CATEGORY_POSITIVE, 0));
                     else
-                        parsedExamples.add(new Example(groupId++, e.substring(1), Example.CATEGORY_NEGATIVE, 0));
+                        parsedExampleWrappers.add(new ExampleWrapper(groupId++, e.substring(1), ExampleWrapper.CATEGORY_NEGATIVE, 0));
                 }
             } else {
                 for (String e : splittedStringExamples) {
@@ -37,9 +37,9 @@ public class ExampleUtils {
                     int position = 0;
                     for (String v : variables)
                         if (positive)
-                            parsedExamples.add(new Example(groupId, v, Example.CATEGORY_POSITIVE, position++));
+                            parsedExampleWrappers.add(new ExampleWrapper(groupId, v, ExampleWrapper.CATEGORY_POSITIVE, position++));
                         else
-                            parsedExamples.add(new Example(groupId, v, Example.CATEGORY_NEGATIVE, position++));
+                            parsedExampleWrappers.add(new ExampleWrapper(groupId, v, ExampleWrapper.CATEGORY_NEGATIVE, position++));
                     groupId++;
                 }
             }
@@ -47,7 +47,7 @@ public class ExampleUtils {
         } else
             throw new ParseException("Invalid example format.", 0);
 
-        return parsedExamples;
+        return parsedExampleWrappers;
     }
 
     private boolean checkStructure(String examples) {
@@ -55,10 +55,10 @@ public class ExampleUtils {
         return examples.matches(pattern);
     }
 
-    public List<String> getExamplesAsListOfString(Collection<Example> exampleCollection){
+    public List<String> getExamplesAsListOfString(Collection<ExampleWrapper> exampleWrapperCollection){
         List<String> result = new LinkedList<>();
 
-        for (Example e: exampleCollection) {
+        for (ExampleWrapper e: exampleWrapperCollection) {
             result.add(e.getExample());
         }
 

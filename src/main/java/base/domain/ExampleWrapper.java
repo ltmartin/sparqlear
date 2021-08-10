@@ -2,7 +2,7 @@ package base.domain;
 
 import java.util.Objects;
 
-public class Example implements Comparable<Example> {
+public class ExampleWrapper implements Comparable<ExampleWrapper> {
     public static final Boolean CATEGORY_POSITIVE = true;
     public static final Boolean CATEGORY_NEGATIVE = false;
 
@@ -11,7 +11,7 @@ public class Example implements Comparable<Example> {
     private Boolean category;
     private Integer position;
 
-    public Example(Integer group, String example, Boolean category, Integer position) {
+    public ExampleWrapper(Integer group, String example, Boolean category, Integer position) {
         this.group = group;
         this.example = example;
         this.category = category;
@@ -39,11 +39,11 @@ public class Example implements Comparable<Example> {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
 
-        Example example1 = (Example) o;
+        ExampleWrapper exampleWrapper1 = (ExampleWrapper) o;
 
-        if (!Objects.equals(group, example1.group)) return false;
-        if (!example.equals(example1.example)) return false;
-        return category.equals(example1.category);
+        if (!Objects.equals(group, exampleWrapper1.group)) return false;
+        if (!example.equals(exampleWrapper1.example)) return false;
+        return category.equals(exampleWrapper1.category);
     }
 
     @Override
@@ -56,7 +56,7 @@ public class Example implements Comparable<Example> {
 
 
     @Override
-    public int compareTo(Example o) {
+    public int compareTo(ExampleWrapper o) {
         if (!this.getGroup().equals(o.getGroup()))
             return this.getGroup().compareTo(o.getGroup());
         else if (!this.getExample().equals(o.getExample()))
