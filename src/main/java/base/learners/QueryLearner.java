@@ -270,6 +270,18 @@ public class QueryLearner {
                 BasicGraphPattern bgp = new BasicGraphPattern();
                 bgp.setTriplePatterns(Stream.of(triple).collect(Collectors.toCollection(HashSet::new)));
                 calculateInformation(bgp, categorizedExamples, temporaryTrainingSet);
+
+                // A reinforcement to boost the selection of triple patterns belonging to the same subject (individual).
+                if (!bestTriplePatterns.isEmpty()){
+                    Node bestTriplePatternSubject = bestTriplePatterns.iterator().next().getSubject();
+                    for (Triple triplePattern : bgp.getTriplePatterns()) {
+                        if (!triplePattern.getSubject().equals(bestTriplePatternSubject)) {
+                            bgp.setInformation(bgp.getInformation() - 0.10);
+                            break;
+                        }
+                    }
+                }
+
                 if (bgp.getInformation() > bestInformation){
                     bestInformation = bgp.getInformation();
                     bestTriple = triple;
