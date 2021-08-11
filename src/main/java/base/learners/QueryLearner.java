@@ -235,7 +235,6 @@ public class QueryLearner {
     }
 
     private BasicGraphPattern tryMotifInstance(Motif motifInstance, BasicGraphPattern cbgp) {
-        // FIXME: There is an Hibernate exception here.
         Set<base.domain.Triple> motifTriples = motifInstance.getTriples();
         for (base.domain.Triple triple : motifTriples) {
             String subject = triple.getSubject();

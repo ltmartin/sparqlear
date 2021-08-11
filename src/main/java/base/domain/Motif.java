@@ -12,7 +12,7 @@ public class Motif {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
 
-    @ManyToMany(cascade = CascadeType.ALL)
+    @ManyToMany(cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     @JoinTable(
             name = "motif_triples",
             joinColumns = @JoinColumn(name = "motif_id"),
