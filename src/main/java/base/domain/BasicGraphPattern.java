@@ -5,7 +5,7 @@ import org.apache.jena.graph.Triple;
 import java.util.HashSet;
 import java.util.Set;
 
-public class BasicGraphPattern {
+public class BasicGraphPattern implements Cloneable {
     private Set<Triple> triplePatterns;
     private double information;
     private double coverage;
@@ -38,5 +38,13 @@ public class BasicGraphPattern {
 
     public void setCoverage(double coverage) {
         this.coverage = coverage;
+    }
+
+    public BasicGraphPattern clone(){
+        BasicGraphPattern cloned = new BasicGraphPattern();
+        cloned.setInformation(this.information);
+        cloned.setCoverage(this.coverage);
+        cloned.setTriplePatterns(new HashSet<>(triplePatterns));
+        return cloned;
     }
 }

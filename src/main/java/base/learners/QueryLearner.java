@@ -2,6 +2,7 @@ package base.learners;
 
 import base.domain.*;
 import base.services.MotifsService;
+import base.utils.Constants;
 import base.utils.DatasetsParser;
 import base.utils.ExampleUtils;
 import base.utils.UtilsJena;
@@ -36,31 +37,20 @@ public class QueryLearner {
     private MotifsService motifsService;
     @Resource
     private UtilsJena utilsJena;
-    @Value("${sparqlear.sparql.endpoint}")
-    private String endpoint;
-    @Value("${sparqlear.sparql.candidateTriples.limit}")
-    private int limit;
-    @Value("${sparqlear.sparql.results.limit}")
-    private String resultsLimit;
     @Value("${sparqlear.sparql.datasets}")
     private String datasets;
-    @Value("${sparqlear.informationGain.threshold}")
-    private double informationGainThreshold;
-    @Value("${sparqlear.learnMultipleQueries}")
-    private Boolean learnMultipleQueries;
 
     private Map<String, List<Triple>> triplesBySelectedVariable = new HashMap<>();
     private Map<String, Node> variableNames = new HashMap<>();
-    private int svIndex = 0, nsvIndex = 0;
-    private Set<ExampleWrapper> parsedExampleWrappers;
-    private LinkedList<BindingWrapper> trainingSet = new LinkedList();
+    private int nsvIndex = 0;
+    private final LinkedList<BindingWrapper> trainingSet = new LinkedList<>();
 
     public Optional<Set<String>> learn(String examples) throws ParseException, IOException {
         Set<String> derivedQueries = new HashSet<>();
         Set<String> parsedDatasets = null;
 
         logger.log(Level.INFO, "Parsing examples...");
-        parsedExampleWrappers = exampleUtils.parseExamples(examples);
+        Set<ExampleWrapper> parsedExampleWrappers = exampleUtils.parseExamples(examples);
         logger.log(Level.INFO, "Examples parsed.");
 
         // Creating the training set with the bindings.
@@ -78,10 +68,11 @@ public class QueryLearner {
 
         Set<ExampleWrapper> positiveExampleWrappers = new HashSet<>(categorizedExamples.get(ExampleWrapper.CATEGORY_POSITIVE));
         Map<Integer, List<ExampleWrapper>> positiveExamplesByComponent = positiveExampleWrappers.stream().collect(Collectors.groupingBy(ExampleWrapper::getPosition));
-        Map<ExampleWrapper, Set<ExampleEntry<String, Triple>>> candidateTriples = deriveCandidateTriples(positiveExamplesByComponent, Optional.empty(), 0);
+        Map<ExampleWrapper, Set<ExampleEntry<String, Triple>>> candidateTriples = deriveCandidateTriples(positiveExamplesByComponent, Optional.empty());
 
         // Extracting the subjects of the candidate triples
         Set<String> individuals = new HashSet<>();
+        assert candidateTriples != null;
         for (Map.Entry<ExampleWrapper, Set<ExampleEntry<String, Triple>>> entry : candidateTriples.entrySet()) {
             Set<ExampleEntry<String, Triple>> value = entry.getValue();
             for (ExampleEntry<String, Triple> exampleEntry : value) {
@@ -103,8 +94,7 @@ public class QueryLearner {
             }
 
             BasicGraphPattern bgp = constructBasicGraphPattern(candidateTriples, categorizedExamples, candidateMotifInstances);
-            if (null != bgp)
-                derivedQueries.add(buildQuery(bgp));
+            derivedQueries.add(buildQuery(bgp));
         } else {
             // TODO: Create the flow for learning from multiple datasets.
         }
@@ -119,7 +109,7 @@ public class QueryLearner {
             List<ExampleWrapper> exampleWrappers = entry.getValue();
             bindings.setCategory(exampleWrappers.get(0).getCategory());
             for (ExampleWrapper exampleWrapper : exampleWrappers) {
-                String distinguishedVariable = "?" + UtilsJena.SELECTED_VARIABLE_PATTERN + exampleWrapper.getPosition();
+                String distinguishedVariable = "?" + Constants.HEAD_VARIABLE_PATTERN + exampleWrapper.getPosition();
                 bindings.getBindings().put(distinguishedVariable, exampleWrapper.getExample());
             }
             trainingSet.add(bindings);
@@ -131,18 +121,18 @@ public class QueryLearner {
             boolean isExampleProvidedByUser = parsedExampleWrappers.stream().anyMatch(exampleWrapper -> exampleWrapper.getExample().equals(cct.getKey()));
 
             if (UtilsJena.getCanonicalExample(cct.getValue().getObject().toString()).equals(cct.getKey())) {
-                Node newSubject = null, newObject = null;
+                Node newSubject = null, newObject;
                 if (!variableNames.containsKey(cct.getKey())) {
                     if (isExampleProvidedByUser)
-                        newObject = NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN + componentIndex);
+                        newObject = NodeFactory.createVariable(Constants.HEAD_VARIABLE_PATTERN + componentIndex);
                     else
-                        newObject = NodeFactory.createVariable("x" + nsvIndex++);
+                        newObject = NodeFactory.createVariable(Constants.EXISTENTIAL_VARIABLE_PATTERN + nsvIndex++);
 
                     variableNames.put(cct.getKey(), newObject);
 
                     // Check if the subject has an existential variable assigned already.
                     if (!variableNames.containsKey(cct.getValue().getSubject().toString())) {
-                        newSubject = NodeFactory.createVariable("x" + nsvIndex++);
+                        newSubject = NodeFactory.createVariable(Constants.EXISTENTIAL_VARIABLE_PATTERN + nsvIndex++);
                         variableNames.put(cct.getValue().getSubject().toString(), newSubject);
                     }
 
@@ -152,7 +142,7 @@ public class QueryLearner {
                     else
                         cct.setValue(new Triple(variableNames.get(cct.getValue().getSubject().toString()), cct.getValue().getPredicate(), newObject));
 
-                    if (newObject.toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN)) {
+                    if (newObject.toString().contains(Constants.HEAD_VARIABLE_PATTERN)) {
                         if (!triplesBySelectedVariable.containsKey(newObject.toString())) {
                             List<Triple> tripleList = new LinkedList<>();
                             tripleList.add(cct.getValue());
@@ -165,12 +155,12 @@ public class QueryLearner {
                     }
                 } else {
                     if (!variableNames.containsKey(cct.getValue().getSubject().toString())) {
-                        newSubject = NodeFactory.createVariable("x" + nsvIndex++);
+                        newSubject = NodeFactory.createVariable(Constants.EXISTENTIAL_VARIABLE_PATTERN + nsvIndex++);
                         variableNames.put(cct.getValue().getSubject().toString(), newSubject);
                     }
                     cct.setValue(new Triple(variableNames.get(cct.getValue().getSubject().toString()), cct.getValue().getPredicate(), variableNames.get(cct.getKey())));
 
-                    if (cct.getValue().getObject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN)) {
+                    if (cct.getValue().getObject().toString().contains(Constants.HEAD_VARIABLE_PATTERN)) {
                         List<Triple> tripleList = triplesBySelectedVariable.get(cct.getValue().getObject().toString());
                         tripleList.add(cct.getValue());
                         triplesBySelectedVariable.replace(cct.getValue().getObject().toString(), tripleList);
@@ -186,9 +176,9 @@ public class QueryLearner {
 
         Set<String> selectedVariables = new HashSet<>();
         for (Triple triple : bgp.getTriplePatterns()) {
-            if (triple.getSubject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+            if (triple.getSubject().toString().contains(Constants.HEAD_VARIABLE_PATTERN))
                 selectedVariables.add(triple.getSubject().toString());
-            if (triple.getObject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+            if (triple.getObject().toString().contains(Constants.HEAD_VARIABLE_PATTERN))
                 selectedVariables.add(triple.getObject().toString());
         }
         List<String> selectedVariablesSorted = new ArrayList<>(selectedVariables);
@@ -221,7 +211,7 @@ public class QueryLearner {
         calculateInformation(cbgp, categorizedExamples, temporaryTrainingSet);
 
         for (Motif motifInstance : candidateMotifInstances) {
-            cbgp = tryMotifInstance(motifInstance, cbgp);
+            tryMotifInstance(motifInstance, cbgp);
         }
 
         return bgp;
@@ -230,29 +220,21 @@ public class QueryLearner {
     // This method is necessary to avoid the default Java copy-by-reference behaviour.
     private void createDeepCopy(List<BindingWrapper> trainingSet, LinkedList<BindingWrapper> temporaryTrainingSet) {
         for (BindingWrapper item : trainingSet) {
-            temporaryTrainingSet.add(new BindingWrapper(item.getCategory(), SerializationUtils.clone((HashMap)item.getBindings())));
+            temporaryTrainingSet.add(new BindingWrapper(item.getCategory(), SerializationUtils.clone((HashMap) item.getBindings())));
         }
     }
 
     private BasicGraphPattern tryMotifInstance(Motif motifInstance, BasicGraphPattern cbgp) {
         Set<base.domain.Triple> motifTriples = motifInstance.getTriples();
+        // Replace all the individuals that already have a variable assigned by the variable.
         for (base.domain.Triple triple : motifTriples) {
-            String subject = triple.getSubject();
-            String object =  triple.getObject();
-
-            // creating a variable for the subject of the triple
-            if (!variableNames.containsKey(subject)){
-                Node newSubjectNode = NodeFactory.createVariable("x" + nsvIndex++);
-                variableNames.put(subject, newSubjectNode);
-            }
-
-            // creating a variable for the object of the triple
-            if (!variableNames.containsKey(object)){
-                Node newObjectNode = NodeFactory.createVariable("x" + nsvIndex++);
-                variableNames.put(subject, newObjectNode);
-            }
+            String subject = UtilsJena.getCanonicalString(triple.getSubject());
+            if (variableNames.containsKey(subject))
+                triple.setSubject(variableNames.get(subject).toString());
         }
 
+        BasicGraphPattern temporaryBgp = cbgp.clone();
+        // TODO: Continue here.
         return cbgp;
     }
 
@@ -263,7 +245,7 @@ public class QueryLearner {
         Set<String> distinguishedVariablesKeySet = candidateTriplesByDistinguishedVariable.keySet();
         for (String distinguishedVariable : distinguishedVariablesKeySet) {
             List<Triple> triplePatterns = candidateTriplesByDistinguishedVariable.get(distinguishedVariable);
-            Double bestInformation = 0.0;
+            double bestInformation = 0.0;
             Triple bestTriple = null;
             for (Triple triple : triplePatterns) {
                 BasicGraphPattern bgp = new BasicGraphPattern();
@@ -271,7 +253,7 @@ public class QueryLearner {
                 calculateInformation(bgp, categorizedExamples, temporaryTrainingSet);
 
                 // A reinforcement to boost the selection of triple patterns belonging to the same subject (individual).
-                if (!bestTriplePatterns.isEmpty()){
+                if (!bestTriplePatterns.isEmpty()) {
                     Node bestTriplePatternSubject = bestTriplePatterns.iterator().next().getSubject();
                     for (Triple triplePattern : bgp.getTriplePatterns()) {
                         if (!triplePattern.getSubject().equals(bestTriplePatternSubject)) {
@@ -281,7 +263,7 @@ public class QueryLearner {
                     }
                 }
 
-                if (bgp.getInformation() > bestInformation){
+                if (bgp.getInformation() > bestInformation) {
                     bestInformation = bgp.getInformation();
                     bestTriple = triple;
                 }
@@ -300,7 +282,7 @@ public class QueryLearner {
         for (int j = 0; j < temporaryTrainingSet.size(); j++) {
             BindingWrapper exampleBinding = temporaryTrainingSet.get(j);
             Set<String> keySet = exampleBinding.getBindings().keySet();
-            Set<String> distinguishedVariableKeys = keySet.stream().filter(key -> key.contains(UtilsJena.SELECTED_VARIABLE_PATTERN)).collect(Collectors.toSet());
+            Set<String> distinguishedVariableKeys = keySet.stream().filter(key -> key.contains(Constants.HEAD_VARIABLE_PATTERN)).collect(Collectors.toSet());
             for (String key : distinguishedVariableKeys) {
                 String bindingInTrainingSet = exampleBinding.getBindings().get(key);
                 List<String> bgpBindingsInstances = bindings.get(key);
@@ -325,8 +307,8 @@ public class QueryLearner {
         }
 
         Set<String> distinguishedVariablesInBgp = new HashSet<>();
-        bgp.getTriplePatterns().stream().forEach(triplePattern -> {
-            if (triplePattern.getObject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+        bgp.getTriplePatterns().forEach(triplePattern -> {
+            if (triplePattern.getObject().toString().contains(Constants.HEAD_VARIABLE_PATTERN))
                 distinguishedVariablesInBgp.add(triplePattern.getObject().toString());
         });
 
@@ -336,7 +318,7 @@ public class QueryLearner {
         int positiveExamplesCovered = 0, negativeExamplesCovered = 0;
         List<String> distinguishedVariableBindingInstances = new LinkedList<>();
         for (BindingWrapper bindingWrapper : temporaryTrainingSet) {
-            distinguishedVariablesInBgp.stream().forEach(dv -> {
+            distinguishedVariablesInBgp.forEach(dv -> {
                 if (bindingWrapper.getBindings().containsKey(dv))
                     distinguishedVariableBindingInstances.add(bindingWrapper.getBindings().get(dv));
             });
@@ -352,7 +334,6 @@ public class QueryLearner {
     }
 
 
-
     private Map<String, List<Triple>> groupCandidateTriplesByDistinguishedVariable(Map<ExampleWrapper, Set<ExampleEntry<String, Triple>>> candidateTriples) {
         List<ExampleEntry<String, Triple>> allCandidateTriples = new LinkedList<>();
 
@@ -361,7 +342,7 @@ public class QueryLearner {
         }
 
         List<ExampleEntry<String, Triple>> candidateTriplesWithDistinguishedVariables = allCandidateTriples.stream()
-                .filter(t -> t.getValue().getObject().toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN))
+                .filter(t -> t.getValue().getObject().toString().contains(Constants.HEAD_VARIABLE_PATTERN))
                 .collect(Collectors.toList());
 
         Map<String, List<Triple>> candidateTriplesByDistinguishedVariable = new HashMap<>();
@@ -370,18 +351,17 @@ public class QueryLearner {
 
             String key = triple.getObject().toString();
             if (candidateTriplesByDistinguishedVariable.containsKey(key)) {
-                List<Triple> triples = new LinkedList<>();
-                triples.addAll(candidateTriplesByDistinguishedVariable.get(key));
+                List<Triple> triples = new LinkedList<>(candidateTriplesByDistinguishedVariable.get(key));
                 triples.add(triple);
                 candidateTriplesByDistinguishedVariable.replace(key, triples);
             } else {
-                candidateTriplesByDistinguishedVariable.put(key, Arrays.asList(triple));
+                candidateTriplesByDistinguishedVariable.put(key, List.of(triple));
             }
         }
         return candidateTriplesByDistinguishedVariable;
     }
 
-    private Map<ExampleWrapper, Set<ExampleEntry<String, Triple>>> deriveCandidateTriples(Map<Integer, List<ExampleWrapper>> positiveExamplesByComponent, Optional<String> dataset, int offset) throws IOException {
+    private Map<ExampleWrapper, Set<ExampleEntry<String, Triple>>> deriveCandidateTriples(Map<Integer, List<ExampleWrapper>> positiveExamplesByComponent, Optional<String> dataset) throws IOException {
         Set<Integer> componentKeys = positiveExamplesByComponent.keySet();
 
         Map<ExampleWrapper, Set<ExampleEntry<String, Triple>>> candidateTriples = new HashMap<>();
@@ -389,7 +369,7 @@ public class QueryLearner {
         for (Integer componentKey : componentKeys) {
             List<ExampleWrapper> componentExampleWrappers = positiveExamplesByComponent.get(componentKey);
             for (ExampleWrapper componentExampleWrapper : componentExampleWrappers) {
-                candidateTriples.put(componentExampleWrapper, tripleFinder.deriveCandidateTriples(componentExampleWrapper.getExample(), dataset, offset));
+                candidateTriples.put(componentExampleWrapper, tripleFinder.deriveCandidateTriples(componentExampleWrapper.getExample(), dataset, 0));
                 // this is because there might be examples that are not present on the dataset, so we can't learn anything from them.
                 if (candidateTriples.get(componentExampleWrapper).isEmpty())
                     return null;

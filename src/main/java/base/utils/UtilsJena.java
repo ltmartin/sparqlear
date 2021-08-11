@@ -28,7 +28,6 @@ import java.util.stream.Stream;
 @Lazy
 public class UtilsJena {
     private final Logger logger = Logger.getLogger(UtilsJena.class.getName());
-    public static final String SELECTED_VARIABLE_PATTERN = "sv";
 
     @Value("${sparqlear.sparql.endpoint}")
     private String endpoint;
