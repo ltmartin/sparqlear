@@ -131,19 +131,26 @@ public class QueryLearner {
             boolean isExampleProvidedByUser = parsedExampleWrappers.stream().anyMatch(exampleWrapper -> exampleWrapper.getExample().equals(cct.getKey()));
 
             if (UtilsJena.getCanonicalExample(cct.getValue().getObject().toString()).equals(cct.getKey())) {
-                Node newSubject, newObject;
+                Node newSubject = null, newObject = null;
                 if (!variableNames.containsKey(cct.getKey())) {
                     if (isExampleProvidedByUser)
                         newObject = NodeFactory.createVariable(UtilsJena.SELECTED_VARIABLE_PATTERN + componentIndex);
                     else
                         newObject = NodeFactory.createVariable("x" + nsvIndex++);
 
-                    newSubject = NodeFactory.createVariable("x" + nsvIndex++);
-
                     variableNames.put(cct.getKey(), newObject);
-                    variableNames.put(cct.getValue().getSubject().toString(), newSubject);
 
-                    cct.setValue(new Triple(newSubject, cct.getValue().getPredicate(), newObject));
+                    // Check if the subject has an existential variable assigned already.
+                    if (!variableNames.containsKey(cct.getValue().getSubject().toString())) {
+                        newSubject = NodeFactory.createVariable("x" + nsvIndex++);
+                        variableNames.put(cct.getValue().getSubject().toString(), newSubject);
+                    }
+
+                    // If there was already an existential variable for the subject, reuse it.
+                    if (null != newSubject)
+                        cct.setValue(new Triple(newSubject, cct.getValue().getPredicate(), newObject));
+                    else
+                        cct.setValue(new Triple(variableNames.get(cct.getValue().getSubject().toString()), cct.getValue().getPredicate(), newObject));
 
                     if (newObject.toString().contains(UtilsJena.SELECTED_VARIABLE_PATTERN)) {
                         if (!triplesBySelectedVariable.containsKey(newObject.toString())) {
