@@ -2,17 +2,24 @@ package base.utils;
 
 import base.domain.BasicGraphPattern;
 import org.apache.commons.validator.routines.UrlValidator;
+import org.apache.jena.datatypes.RDFDatatype;
+import org.apache.jena.ext.xerces.util.URI;
+import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
 import org.apache.jena.query.*;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.engine.binding.Binding;
+import org.apache.jena.sparql.util.NodeFactoryExtra;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
+import javax.print.attribute.URISyntax;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -236,5 +243,39 @@ public class UtilsJena {
         if (annotatedString.contains("@"))
             return annotatedString.substring(0, annotatedString.indexOf("@"));
         return annotatedString;
+    }
+
+    public static boolean isVariable(String element){
+        return element.startsWith("?");
+    }
+
+    public static Set<Triple> convertDomainTriplesToJenaTriples(Set<base.domain.Triple> domainTriples){
+        Set<Triple> triples = new HashSet<>();
+        for (base.domain.Triple domainTriple : domainTriples) {
+            Node subject = null, object = null;
+            if (UtilsJena.isVariable(domainTriple.getSubject())){
+                subject = NodeFactory.createVariable(domainTriple.getSubject().substring(1));
+            } else
+                try {
+                    String subjectString = domainTriple.getSubject();
+                    new URL(getCanonicalString(subjectString));
+                    subject = NodeFactory.createURI(subjectString);
+                } catch (MalformedURLException e) {
+                    subject = NodeFactory.createLiteral(domainTriple.getSubject());
+                }
+
+            if (UtilsJena.isVariable(domainTriple.getObject())){
+                object = NodeFactory.createVariable(domainTriple.getObject().substring(1));
+            } else try {
+                String objectString = domainTriple.getObject();
+                new URL(getCanonicalString(objectString));
+                object = NodeFactory.createURI(objectString);
+            } catch (MalformedURLException e) {
+                object = NodeFactory.createLiteral(domainTriple.getObject());
+            }
+
+            triples.add(new Triple(subject, NodeFactory.createURI(domainTriple.getPredicate()), object));
+        }
+        return triples;
     }
 }
