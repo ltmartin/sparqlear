@@ -50,8 +50,13 @@ public class QueryLearner {
     public QueryLearner() {
         // this priority queue will prioritize the states where the sum of information and coverage is bigger.
         this.states = new PriorityQueue<>((state1, state2) -> {
-            if (((state1.getCoverage() + state1.getInformation()) < (state2.getCoverage()+ state2.getInformation()))) return -1;
-            if (((state1.getCoverage() + state1.getInformation()) > (state2.getCoverage()+ state2.getInformation()))) return 1;
+            if (((state1.getCoverage() + state1.getInformation()) < (state2.getCoverage()+ state2.getInformation()))) return 1;
+            if (((state1.getCoverage() + state1.getInformation()) > (state2.getCoverage()+ state2.getInformation()))) return -1;
+
+            // if the information is the same, we think that a bgp with more triple patterns will be more explicative.
+            if (state1.getBasicGraphPattern().getTriplePatterns().size() < state2.getBasicGraphPattern().getTriplePatterns().size()) return 1;
+            if (state1.getBasicGraphPattern().getTriplePatterns().size() > state2.getBasicGraphPattern().getTriplePatterns().size()) return -1;
+
             return 0;
         });
     }
@@ -228,18 +233,23 @@ public class QueryLearner {
         computeCoverage(state);
         states.add(state);
 
-        /*for (Motif motifInstance : candidateMotifInstances) {
-            tryMotifInstance(motifInstance, cbgp);
-        }*/
+        // TODO: Test this method, it seems to be working well, but continue testing it.
+        for (Motif motifInstance : candidateMotifInstances) {
+            temporaryTrainingSet = new LinkedList<>();
+            createDeepCopy(trainingSet, temporaryTrainingSet);
+            bgp = tryMotifInstance(motifInstance, cbgp, temporaryTrainingSet);
+        }
 
         return bgp;
     }
 
     private void computeCoverage(State state) {
-        // Obtaining the bindings of the BGP
+        // Obtaining the bindings of the BGP.
         Map<String, List<String>> bindings = utilsJena.getBindings(state.getBasicGraphPattern());
+
+        // Extracting the bindings of the head variables.
         Set<String> bindingsKeys = bindings.keySet();
-        List<String> bindingValues = new LinkedList<>();
+        Set<String> bindingValues = new HashSet<>();
         for (String key : bindingsKeys) {
             if (key.contains(Constants.HEAD_VARIABLE_PATTERN)){
                 List<String> values = bindings.get(key);
@@ -249,6 +259,7 @@ public class QueryLearner {
             }
         }
 
+        // Counting the positive examples covered.
         int positiveExamplesCovered = 0;
         List<ExampleWrapper> positiveExampleWrappers = categorizedExamples.get(ExampleWrapper.CATEGORY_POSITIVE);
         for (ExampleWrapper exampleWrapper : positiveExampleWrappers) {
@@ -268,57 +279,64 @@ public class QueryLearner {
         }
     }
 
-    /*private BasicGraphPattern tryMotifInstance(Motif motifInstance, BasicGraphPattern cbgp) {
+    private BasicGraphPattern tryMotifInstance(Motif motifInstance, BasicGraphPattern cbgp, LinkedList<BindingWrapper> temporaryTrainingSet) {
         Set<base.domain.Triple> motifTriples = motifInstance.getTriples();
+        Set<String> constantsInMotif = new HashSet<>();
         // Replace all the individuals that already have a variable assigned by the variable.
         for (base.domain.Triple triple : motifTriples) {
             String subject = UtilsJena.getCanonicalString(triple.getSubject());
+            // This line is to take advantage of the loop and store the constant in a collection for later use.
+            constantsInMotif.add(subject);
+
             if (variableNames.containsKey(subject))
                 triple.setSubject(variableNames.get(subject).toString());
+
+            // The two lines are to take advantage of the loop and store the constants in a collection for later use.
+            String object = UtilsJena.getCanonicalString(triple.getObject());
+            constantsInMotif.add(object);
         }
 
         BasicGraphPattern temporaryBgp = cbgp.clone();
+        for (String constant : constantsInMotif) {
+            // Keeping a copy of the motif instance for the case I need to restore it.
+            Motif savedMotifInstance = motifInstance.clone();
 
-        for (base.domain.Triple triple : motifTriples) {
-            String subject = triple.getSubject();
-            // If the subject is not a variable already create a new one and calculate the information.
-            if (!UtilsJena.isVariable(subject)){
-                if (!variableNames.containsKey(subject))
-                    variableNames.put(subject, NodeFactory.createVariable(Constants.EXISTENTIAL_VARIABLE_PATTERN + nsvIndex++));
+            replaceConstantInMotifTriples(constant, motifInstance);
+            Set<Triple> bgpTriplePatterns = temporaryBgp.getTriplePatterns();
+            bgpTriplePatterns.addAll(UtilsJena.convertDomainTriplesToJenaTriples(motifInstance.getTriples()));
+            temporaryBgp.setTriplePatterns(bgpTriplePatterns);
+            State state = calculateInformation(temporaryBgp,temporaryTrainingSet);
+            computeCoverage(state);
+            states.add(state);
 
-                triple.setSubject(variableNames.get(subject).toString());
-
-                temporaryBgp.getTriplePatterns().addAll(UtilsJena.convertDomainTriplesToJenaTriples(motifTriples));
-
-                LinkedList<BindingWrapper> temporaryTrainingSet = new LinkedList<>();
-                createDeepCopy(trainingSet, temporaryTrainingSet);
-                calculateInformation(temporaryBgp, temporaryTrainingSet);
-                if (temporaryBgp.getInformation() < cbgp.getInformation()){
-                    triple.setSubject(subject);
-                }
-            }
-
-            // If the object is not a variable already create a new one and calculate the information.
-            String object = triple.getObject();
-            if (!UtilsJena.isVariable(object)){
-                if (!variableNames.containsKey(object))
-                    variableNames.put(object, NodeFactory.createVariable(Constants.EXISTENTIAL_VARIABLE_PATTERN + nsvIndex++));
-
-                triple.setObject(variableNames.get(object).toString());
-
-                temporaryBgp.getTriplePatterns().addAll(UtilsJena.convertDomainTriplesToJenaTriples(motifTriples));
-
-                LinkedList<BindingWrapper> temporaryTrainingSet = new LinkedList<>();
-                createDeepCopy(trainingSet, temporaryTrainingSet);
-                calculateInformation(temporaryBgp, temporaryTrainingSet);
-                if (temporaryBgp.getInformation() < cbgp.getInformation()){
-                    triple.setObject(object);
-                }
+            if (!states.peek().equals(state)) {
+                temporaryBgp = states.peek().getBasicGraphPattern().clone();
+                motifInstance = savedMotifInstance.clone();
             }
         }
-        // TODO: Test this method and continue it.
-        return cbgp;
-    }*/
+        // return the best bgp in the priority queue.
+        return states.peek().getBasicGraphPattern();
+    }
+
+    private void replaceConstantInMotifTriples(String constant, Motif motifInstance) {
+        if (!variableNames.containsKey(constant)){
+            variableNames.put(constant, NodeFactory.createVariable(Constants.EXISTENTIAL_VARIABLE_PATTERN + nsvIndex++));
+        }
+        Set<base.domain.Triple> motifTriples = motifInstance.getTriples();
+        Set<base.domain.Triple> newTriplePatterns = new HashSet<>();
+
+        for (base.domain.Triple triple : motifTriples) {
+            String tripleSubject = UtilsJena.getCanonicalString(triple.getSubject());
+            if (tripleSubject.equals(constant))
+                triple.setSubject(variableNames.get(constant).toString());
+            String tripleObject = UtilsJena.getCanonicalString(triple.getObject());
+            if (tripleObject.equals(constant))
+                triple.setObject(variableNames.get(constant).toString());
+            newTriplePatterns.add(triple);
+        }
+        motifInstance.setTriples(newTriplePatterns);
+    }
+
 
     private Set<String> getVariablesInCbgp(BasicGraphPattern cbgp) {
         Set<String> variablesInCbgp = new HashSet<>();

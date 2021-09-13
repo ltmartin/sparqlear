@@ -7,7 +7,7 @@ import java.util.Objects;
 import java.util.Set;
 
 @Entity
-public class Triple {
+public class Triple implements Cloneable{
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
@@ -82,5 +82,9 @@ public class Triple {
     @Override
     public int hashCode() {
         return Objects.hash(UtilsJena.getCanonicalString(subject), predicate, UtilsJena.getCanonicalString(object));
+    }
+
+    public Triple clone(){
+        return new Triple(this.subject, this.predicate, this.object);
     }
 }

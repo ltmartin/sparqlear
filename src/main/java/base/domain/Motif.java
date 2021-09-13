@@ -7,7 +7,7 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Entity
-public class Motif {
+public class Motif implements Cloneable{
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
@@ -46,5 +46,13 @@ public class Motif {
 
     public void setTriples(Set<Triple> triples) {
         this.triples = triples;
+    }
+
+    public Motif clone(){
+        Motif newMotif = new Motif();
+        for (Triple t : this.triples) {
+            newMotif.addTriple(t.clone());
+        }
+        return newMotif;
     }
 }

@@ -11,6 +11,7 @@ import org.apache.jena.query.*;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.engine.binding.Binding;
 import org.apache.jena.sparql.util.NodeFactoryExtra;
+import org.apache.jena.sparql.util.Utils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
@@ -99,12 +100,12 @@ public class UtilsJena {
     }
 
     private String insertBrackets(String element, String HTTP_PREFIX, String HTTPS_PREFIX) {
-        if (element.contains(HTTP_PREFIX)){
+        if (element.contains(HTTP_PREFIX) && !(element.startsWith("<"))){
             StringBuilder stringBuilder = new StringBuilder(element);
             stringBuilder.insert(stringBuilder.indexOf(HTTP_PREFIX),"<");
             stringBuilder.append(">");
             element = stringBuilder.toString();
-        } else if (element.contains(HTTPS_PREFIX)){
+        } else if (element.contains(HTTPS_PREFIX) && !(element.startsWith("<"))){
             StringBuilder stringBuilder = new StringBuilder(element);
             stringBuilder.insert(stringBuilder.indexOf(HTTPS_PREFIX),"<");
             stringBuilder.append(">");
@@ -205,8 +206,13 @@ public class UtilsJena {
     private String buildSelectQuery(BasicGraphPattern bgp){
         Set<String> variables = new HashSet<>();
         for (Triple triple : bgp.getTriplePatterns()) {
-            variables.add(triple.getSubject().toString());
-            variables.add(triple.getObject().toString());
+            String tripleSubject = triple.getSubject().toString();
+            String tripleObject = triple.getObject().toString();
+
+            if (tripleSubject.contains("?"+ Constants.HEAD_VARIABLE_PATTERN) || tripleSubject.contains("?"+ Constants.EXISTENTIAL_VARIABLE_PATTERN))
+                variables.add(tripleSubject);
+            if (tripleObject.contains("?"+ Constants.HEAD_VARIABLE_PATTERN) || tripleObject.contains("?"+ Constants.EXISTENTIAL_VARIABLE_PATTERN))
+                variables.add(tripleObject);
         }
 
         StringBuilder builder = new StringBuilder();
