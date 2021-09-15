@@ -233,14 +233,17 @@ public class QueryLearner {
         computeCoverage(state);
         states.add(state);
 
-        // TODO: Test this method, it seems to be working well, but continue testing it.
         for (Motif motifInstance : candidateMotifInstances) {
             temporaryTrainingSet = new LinkedList<>();
             createDeepCopy(trainingSet, temporaryTrainingSet);
-            bgp = tryMotifInstance(motifInstance, cbgp, temporaryTrainingSet);
+            tryMotifInstance(motifInstance, cbgp, temporaryTrainingSet);
+
+            // If the state contains a motif and it has maximum information and coverage return it.
+            if ((!states.peek().equals(state)) && (states.peek().getInformation() == 1) && (states.peek().getCoverage() == 1))
+                break;
         }
 
-        return bgp;
+        return states.poll().getBasicGraphPattern();
     }
 
     private void computeCoverage(State state) {
@@ -279,7 +282,7 @@ public class QueryLearner {
         }
     }
 
-    private BasicGraphPattern tryMotifInstance(Motif motifInstance, BasicGraphPattern cbgp, LinkedList<BindingWrapper> temporaryTrainingSet) {
+    private void tryMotifInstance(Motif motifInstance, BasicGraphPattern cbgp, LinkedList<BindingWrapper> temporaryTrainingSet) {
         Set<base.domain.Triple> motifTriples = motifInstance.getTriples();
         Set<String> constantsInMotif = new HashSet<>();
         // Replace all the individuals that already have a variable assigned by the variable.
@@ -295,6 +298,12 @@ public class QueryLearner {
             String object = UtilsJena.getCanonicalString(triple.getObject());
             constantsInMotif.add(object);
         }
+
+        // verify that the motif contains variables present on the cbgp.
+        Set<String> variablesInMotif = getVariablesInMotif(motifTriples);
+        Set<String> variablesInCbgp = getVariablesInCbgp(cbgp);
+        if (Sets.intersection(variablesInCbgp, variablesInMotif).isEmpty())
+            return;
 
         BasicGraphPattern temporaryBgp = cbgp.clone();
         for (String constant : constantsInMotif) {
@@ -314,8 +323,6 @@ public class QueryLearner {
                 motifInstance = savedMotifInstance.clone();
             }
         }
-        // return the best bgp in the priority queue.
-        return states.peek().getBasicGraphPattern();
     }
 
     private void replaceConstantInMotifTriples(String constant, Motif motifInstance) {
