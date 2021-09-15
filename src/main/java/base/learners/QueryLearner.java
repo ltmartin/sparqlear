@@ -54,10 +54,8 @@ public class QueryLearner {
             if (((state1.getCoverage() + state1.getInformation()) > (state2.getCoverage()+ state2.getInformation()))) return -1;
 
             // if the information is the same, we think that a bgp with more triple patterns will be more explicative.
-            if (state1.getBasicGraphPattern().getTriplePatterns().size() < state2.getBasicGraphPattern().getTriplePatterns().size()) return 1;
-            if (state1.getBasicGraphPattern().getTriplePatterns().size() > state2.getBasicGraphPattern().getTriplePatterns().size()) return -1;
+            return Integer.compare(state2.getBasicGraphPattern().getTriplePatterns().size(), state1.getBasicGraphPattern().getTriplePatterns().size());
 
-            return 0;
         });
     }
 
