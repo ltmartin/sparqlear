@@ -4,7 +4,6 @@ import base.domain.*;
 import base.services.MotifsService;
 import base.utils.*;
 import com.google.common.collect.Sets;
-import org.apache.commons.collections.ListUtils;
 import org.apache.commons.lang3.SerializationUtils;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
