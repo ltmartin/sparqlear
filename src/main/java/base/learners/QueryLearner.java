@@ -230,10 +230,11 @@ public class QueryLearner {
         computeCoverage(state);
         states.add(state);
 
+        LinkedList<BindingWrapper> trainingSetForMotifs = new LinkedList<>();
         for (Motif motifInstance : candidateMotifInstances) {
-            temporaryTrainingSet = new LinkedList<>();
-            createDeepCopy(trainingSet, temporaryTrainingSet);
-            tryMotifInstance(motifInstance, cbgp, temporaryTrainingSet);
+            // We save the training set created when the best triple patterns were chosen, and continue from there.
+            createDeepCopy(temporaryTrainingSet, trainingSetForMotifs);
+            tryMotifInstance(motifInstance, cbgp, trainingSetForMotifs);
 
             // If the state contains a motif and it has maximum information and coverage return it.
             if ((!states.peek().equals(state)) && (states.peek().getInformation() == 1) && (states.peek().getCoverage() == 1))
