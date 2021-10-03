@@ -105,13 +105,49 @@ public class QueryLearner {
             for (ExampleWrapper exampleWrapper : candidateTriplesKeySet) {
                 introduceVariables(candidateTriples.get(exampleWrapper), parsedExampleWrappers, triplesBySelectedVariable, exampleWrapper.getPosition());
             }
+            State bestAchievedState = null;
+            Set<BasicGraphPattern> bgps = new HashSet<>();
 
-            BasicGraphPattern bgp = constructBasicGraphPattern(candidateTriples, candidateMotifInstances);
-            derivedQueries.add(buildQuery(bgp));
+            do {
+                constructBasicGraphPattern(candidateTriples, candidateMotifInstances);
+                bestAchievedState = states.poll();
+                BasicGraphPattern bgp = bestAchievedState.getBasicGraphPattern();
+                bgps.add(bgp);
+                removeCoveredExamplesFromTrainigSet(bgp);
+                // FIXME: Check the condition in the while
+            } while ((bestAchievedState.getCoverage() < 1) && (!trainingSet.isEmpty()));
+
+            derivedQueries.add(buildQuery(bgps));
         } else {
             // TODO: Create the flow for learning from multiple datasets.
         }
         return Optional.of(derivedQueries);
+    }
+
+    private void removeCoveredExamplesFromTrainigSet(BasicGraphPattern bgp) {
+        // Obtaining the bindings of the BGP
+        Map<String, List<String>> bindings = utilsJena.getBindings(bgp);
+
+        Set<String> keys = bindings.keySet();
+        keys.removeIf(key -> !key.contains("?" + Constants.HEAD_VARIABLE_PATTERN));
+        for (int i = 0; i < trainingSet.size(); i++) {
+            Map<String, String> bindingWrapperBindings = trainingSet.get(i).getBindings();
+            List<String> bindingWrapperBindingsKeys = bindingWrapperBindings.keySet().stream().collect(Collectors.toList());
+            for (int j = 0; j < bindingWrapperBindingsKeys.size(); j++) {
+                String key = bindingWrapperBindingsKeys.get(j);
+                if (keys.contains(key)){
+
+                    List<String> keyBindings = bindings.get(key);
+                    for (int k = 0; k < keyBindings.size(); k++) {
+                        String keyBinding = keyBindings.get(k);
+                        if ((null != bindingWrapperBindings.get(key)) && (keyBinding.contains(bindingWrapperBindings.get(key))))
+                            bindingWrapperBindings.remove(key);
+                    }
+                }
+            }
+            if (bindingWrapperBindings.isEmpty())
+                trainingSet.remove(i);
+        }
     }
 
     private void createTrainingSet(Set<ExampleWrapper> parsedExampleWrappers) {
@@ -186,16 +222,18 @@ public class QueryLearner {
         }
     }
 
-    private String buildQuery(BasicGraphPattern bgp) {
+    private String buildQuery(Set<BasicGraphPattern> bgps) {
         StringBuilder stringBuilder = new StringBuilder();
         stringBuilder.append("SELECT DISTINCT ");
 
         Set<String> selectedVariables = new HashSet<>();
-        for (Triple triple : bgp.getTriplePatterns()) {
-            if (triple.getSubject().toString().contains(Constants.HEAD_VARIABLE_PATTERN))
-                selectedVariables.add(triple.getSubject().toString());
-            if (triple.getObject().toString().contains(Constants.HEAD_VARIABLE_PATTERN))
-                selectedVariables.add(triple.getObject().toString());
+        for (BasicGraphPattern bgp : bgps) {
+            for (Triple triple : bgp.getTriplePatterns()) {
+                if (triple.getSubject().toString().contains(Constants.HEAD_VARIABLE_PATTERN))
+                    selectedVariables.add(triple.getSubject().toString());
+                if (triple.getObject().toString().contains(Constants.HEAD_VARIABLE_PATTERN))
+                    selectedVariables.add(triple.getObject().toString());
+            }
         }
         List<String> selectedVariablesSorted = new ArrayList<>(selectedVariables);
         Collections.sort(selectedVariablesSorted);
@@ -204,15 +242,27 @@ public class QueryLearner {
         }
 
         stringBuilder.append("WHERE { ");
-        for (Triple triple : bgp.getTriplePatterns()) {
-            stringBuilder.append(utilsJena.getSparqlCompatibleTriple(triple)).append(" . ");
+        for (BasicGraphPattern bgp : bgps) {
+            if (bgps.size() > 1)
+                stringBuilder.append("{ ");
+
+            for (Triple triple : bgp.getTriplePatterns()) {
+                stringBuilder.append(utilsJena.getSparqlCompatibleTriple(triple)).append(" . ");
+            }
+
+            if (bgps.size() > 1)
+                stringBuilder.append(" } UNION ");
         }
+
+        if (bgps.size() > 1)
+            stringBuilder.delete(stringBuilder.lastIndexOf(" UNION "), stringBuilder.length());
+
         stringBuilder.append("}");
 
         return stringBuilder.toString();
     }
 
-    private BasicGraphPattern constructBasicGraphPattern(Map<ExampleWrapper, Set<ExampleEntry<String, Triple>>> candidateTriplePatterns, Set<Motif> candidateMotifInstances) {
+    private void constructBasicGraphPattern(Map<ExampleWrapper, Set<ExampleEntry<String, Triple>>> candidateTriplePatterns, Set<Motif> candidateMotifInstances) {
         BasicGraphPattern bgp = new BasicGraphPattern();
         Map<String, List<Triple>> candidateTriplesByDistinguishedVariable = groupCandidateTriplesByDistinguishedVariable(candidateTriplePatterns);
 
@@ -240,8 +290,6 @@ public class QueryLearner {
             if ((!states.peek().equals(state)) && (states.peek().getInformation() == 1) && (states.peek().getCoverage() == 1))
                 break;
         }
-
-        return states.poll().getBasicGraphPattern();
     }
 
     private void computeCoverage(State state) {
