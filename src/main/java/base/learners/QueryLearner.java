@@ -287,7 +287,7 @@ public class QueryLearner {
             tryMotifInstance(motifInstance, cbgp, trainingSetForMotifs);
 
             // If the state contains a motif and it has maximum information and coverage return it.
-            if ((!states.peek().equals(state)) && (states.peek().getInformation() >= 0.8) && (states.peek().getCoverage() >= 0.6))
+            if ((!states.peek().equals(state)) && (states.peek().getInformation() == 1) && (states.peek().getCoverage() == 1))
                 break;
         }
     }
