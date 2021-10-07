@@ -1,5 +1,6 @@
 package base.domain;
 
+import java.util.LinkedList;
 import java.util.List;
 
 public class State {
@@ -7,18 +8,21 @@ public class State {
     private double coverage;
     private BasicGraphPattern basicGraphPattern;
     private List<BindingWrapper> trainingSet;
-
-    public State(double information, double coverage, BasicGraphPattern basicGraphPattern, List<BindingWrapper> trainingSet) {
-        this.information = information;
-        this.coverage = coverage;
-        this.basicGraphPattern = basicGraphPattern;
-        this.trainingSet = trainingSet;
-    }
+    private Motif motifInstance;
 
     public State(double information, BasicGraphPattern basicGraphPattern, List<BindingWrapper> trainingSet) {
         this.information = information;
         this.basicGraphPattern = basicGraphPattern;
         this.trainingSet = trainingSet;
+
+    }
+
+    public Motif getMotifInstance() {
+        return motifInstance;
+    }
+
+    public void setMotifInstance(Motif motifInstance) {
+        this.motifInstance = motifInstance;
     }
 
     public double getInformation() {

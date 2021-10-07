@@ -350,22 +350,36 @@ public class QueryLearner {
         if (Sets.intersection(variablesInCbgp, variablesInMotif).isEmpty())
             return;
 
-        BasicGraphPattern temporaryBgp = cbgp.clone();
-        for (String constant : constantsInMotif) {
-            // Keeping a copy of the motif instance for the case I need to restore it.
-            Motif savedMotifInstance = motifInstance.clone();
+        for (int i = 0; i < constantsInMotif.size(); i++) {
+            BasicGraphPattern temporaryBgp = states.peek().getBasicGraphPattern().clone();
+            for (String constant : constantsInMotif) {
+                // Keeping a copy of the motif instance for the case I need to restore it.
+                Motif savedMotifInstance = motifInstance.clone();
 
-            replaceConstantInMotifTriples(constant, motifInstance);
-            Set<Triple> bgpTriplePatterns = temporaryBgp.getTriplePatterns();
-            bgpTriplePatterns.addAll(UtilsJena.convertDomainTriplesToJenaTriples(motifInstance.getTriples()));
-            temporaryBgp.setTriplePatterns(bgpTriplePatterns);
-            State state = calculateInformation(temporaryBgp,temporaryTrainingSet);
-            computeCoverage(state);
-            states.add(state);
+                replaceConstantInMotifTriples(constant, motifInstance);
+                Set<Triple> bgpTriplePatterns = temporaryBgp.getTriplePatterns();
+                bgpTriplePatterns.addAll(UtilsJena.convertDomainTriplesToJenaTriples(motifInstance.getTriples()));
+                temporaryBgp.setTriplePatterns(bgpTriplePatterns);
+                State state = calculateInformation(temporaryBgp,temporaryTrainingSet);
+                computeCoverage(state);
+                state.setMotifInstance(motifInstance);
+                states.add(state);
 
-            if (!states.peek().equals(state)) {
-                temporaryBgp = states.peek().getBasicGraphPattern().clone();
+                if ((state.getCoverage() == 1) && (state.getInformation() == 1))
+                    return;
+
+                // restore the motif instance
                 motifInstance = savedMotifInstance.clone();
+            }
+
+
+            // The best state might not contain a motif. In order to explore further the motif instance
+            // we choose the best motif instance we can find, and try to generate a better state using it.
+            for (State s : states) {
+                if (null != s.getMotifInstance()){
+                    motifInstance = s.getMotifInstance();
+                    break;
+                }
             }
         }
     }
