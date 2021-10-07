@@ -114,7 +114,6 @@ public class QueryLearner {
                 BasicGraphPattern bgp = bestAchievedState.getBasicGraphPattern();
                 bgps.add(bgp);
                 removeCoveredExamplesFromTrainigSet(bgp);
-                // FIXME: Check the condition in the while
             } while ((bestAchievedState.getCoverage() < 1) && (!trainingSet.isEmpty()));
 
             derivedQueries.add(buildQuery(bgps));

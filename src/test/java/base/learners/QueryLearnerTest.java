@@ -85,4 +85,22 @@ class QueryLearnerTest {
             e.printStackTrace();
         }
     }
+
+    @Test
+    void unionMultipleVariableExamples() {
+        String examples = "+(Frances, American) +(Peter, American) +(Lindsay, Australian)";
+        try {
+            Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
+            System.out.println("===================================================");
+            System.out.println("Result: ");
+            if (!learnedQueries.isPresent())
+                System.out.println("Nothing learned.");
+            else
+                learnedQueries.stream().forEach(System.out::println);
+
+            System.out.println("===================================================");
+        } catch (ParseException | IOException e) {
+            e.printStackTrace();
+        }
+    }
 }
