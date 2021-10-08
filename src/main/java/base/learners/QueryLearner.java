@@ -318,8 +318,10 @@ public class QueryLearner {
         List<ExampleWrapper> positiveExampleWrappers = categorizedExamples.get(ExampleWrapper.CATEGORY_POSITIVE);
         for (ExampleWrapper exampleWrapper : positiveExampleWrappers) {
             for (String binding : bindingValues) {
-                if (binding.contains(exampleWrapper.getExample()))
+                if (binding.contains(exampleWrapper.getExample())) {
                     positiveExamplesCovered++;
+                    break;
+                }
             }
 
         }
@@ -361,6 +363,7 @@ public class QueryLearner {
             for (String constant : constantsInMotif) {
                 // Keeping a copy of the motif instance for the case I need to restore it.
                 Motif savedMotifInstance = motifInstance.clone();
+                BasicGraphPattern savedBgp = temporaryBgp.clone();
 
                 replaceConstantInMotifTriples(constant, motifInstance);
                 Set<Triple> bgpTriplePatterns = temporaryBgp.getTriplePatterns();
@@ -376,6 +379,8 @@ public class QueryLearner {
 
                 // restore the motif instance
                 motifInstance = savedMotifInstance.clone();
+                // restore the temporaryBgp
+                temporaryBgp = savedBgp.clone();
             }
 
 

@@ -87,8 +87,8 @@ class QueryLearnerTest {
     }
 
     @Test
-    void unionMultipleVariableExamples() {
-        String examples = "+(Frances, American) +(Peter, American) +(Lindsay, Australian)";
+    void positiveMultipleVariableExamples2() {
+        String examples = "+(Frances, American, 2000-12-27) +(Peter, American, 2010-03-30) +(Lindsay, Australian, 1970-09-12)";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");
