@@ -112,15 +112,17 @@ public class QueryLearner {
                 constructBasicGraphPattern(candidateTriples, candidateMotifInstances);
                 bestAchievedState = states.poll();
 
-                // Printing the ID of the selected motif for experimentation purposes.
-                System.out.println("==============================================");
-                System.out.println("Selected motif ID: " + bestAchievedState.getMotifInstance().getId());
-                System.out.println("==============================================");
+                if (null != bestAchievedState.getMotifInstance()) {
+                    // Printing the ID of the selected motif for experimentation purposes.
+                    System.out.println("==============================================");
+                    System.out.println("Selected motif ID: " + bestAchievedState.getMotifInstance().getId());
+                    System.out.println("==============================================");
+                }
 
                 BasicGraphPattern bgp = bestAchievedState.getBasicGraphPattern();
                 bgps.add(bgp);
                 removeCoveredExamplesFromTrainigSet(bgp);
-            } while ((bestAchievedState.getCoverage() < 1) && (!trainingSet.isEmpty()));
+            } while (bestAchievedState.getCoverage() < 1);
 
             derivedQueries.add(buildQuery(bgps));
         } else {
