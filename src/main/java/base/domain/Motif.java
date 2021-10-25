@@ -53,6 +53,7 @@ public class Motif implements Cloneable{
         for (Triple t : this.triples) {
             newMotif.addTriple(t.clone());
         }
+        newMotif.setId(this.getId());
         return newMotif;
     }
 }
