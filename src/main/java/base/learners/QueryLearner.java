@@ -113,11 +113,15 @@ public class QueryLearner {
                 bestAchievedState = states.poll();
 
                 if (null != bestAchievedState.getMotifInstance()) {
-                    // Printing the ID of the selected motif for experimentation purposes.
+                    // Printing some values for experimentation purposes.
                     System.out.println("==============================================");
                     System.out.println("Selected motif ID: " + bestAchievedState.getMotifInstance().getId());
                     System.out.println("==============================================");
                 }
+                System.out.println("==============================================");
+                System.out.println("Information: " + bestAchievedState.getInformation());
+                System.out.println("Coverage: " + bestAchievedState.getCoverage());
+                System.out.println("==============================================");
 
                 BasicGraphPattern bgp = bestAchievedState.getBasicGraphPattern();
                 bgps.add(bgp);
@@ -300,33 +304,17 @@ public class QueryLearner {
     }
 
     private void computeCoverage(State state) {
-        // Obtaining the bindings of the BGP.
-        Map<String, List<String>> bindings = utilsJena.getBindings(state.getBasicGraphPattern());
-
-        // Extracting the bindings of the head variables.
-        Set<String> bindingsKeys = bindings.keySet();
-        Set<String> bindingValues = new HashSet<>();
-        for (String key : bindingsKeys) {
-            if (key.contains(Constants.HEAD_VARIABLE_PATTERN)){
-                List<String> values = bindings.get(key);
-                for (String value : values) {
-                    bindingValues.add(UtilsJena.getCanonicalString(value));
-                }
-            }
-        }
-
-        // Counting the positive examples covered.
         int positiveExamplesCovered = 0;
         List<ExampleWrapper> positiveExampleWrappers = categorizedExamples.get(ExampleWrapper.CATEGORY_POSITIVE);
         for (ExampleWrapper exampleWrapper : positiveExampleWrappers) {
-            for (String binding : bindingValues) {
-                if (binding.contains(exampleWrapper.getExample())) {
+            for (BindingWrapper bindingWrapper : state.getTrainingSet()) {
+                if (bindingWrapper.getBindings().values().contains(exampleWrapper.getExample())){
                     positiveExamplesCovered++;
                     break;
                 }
             }
-
         }
+
         state.setCoverage((double) positiveExamplesCovered / positiveExampleWrappers.size());
     }
 
@@ -384,7 +372,6 @@ public class QueryLearner {
                 // restore the temporaryBgp
                 temporaryBgp = savedBgp.clone();
             }
-
 
             // The best state might not contain a motif. In order to explore further the motif instance
             // we choose the best motif instance we can find, and try to generate a better state using it.
@@ -478,6 +465,11 @@ public class QueryLearner {
         // Obtaining the bindings of the BGP
         Map<String, List<String>> bindings = utilsJena.getBindings(bgp);
 
+        // removing any duplicates
+        Set<BindingWrapper> noDuplicates = new LinkedHashSet<>(temporaryTrainingSet);
+        temporaryTrainingSet.clear();
+        temporaryTrainingSet.addAll(noDuplicates);
+
         // Joining the training set with the bindings coming from the BGP
         for (int j = 0; j < temporaryTrainingSet.size(); j++) {
             BindingWrapper exampleBinding = temporaryTrainingSet.get(j);
@@ -506,23 +498,10 @@ public class QueryLearner {
             }
         }
 
-        List<ExampleWrapper> positiveExampleWrappers = categorizedExamples.get(ExampleWrapper.CATEGORY_POSITIVE);
-        List<ExampleWrapper> negativeExampleWrappers = categorizedExamples.get(ExampleWrapper.CATEGORY_NEGATIVE);
-
-        int positiveExamplesCovered = 0, negativeExamplesCovered = 0;
-        // Take all the bindings from the training set
-        List<String> bindingInstances = new LinkedList<>();
-        for (BindingWrapper bindingWrapper : temporaryTrainingSet) {
-            bindingInstances.addAll(bindingWrapper.getBindings().values());
-        }
-
-        // count how many of the examples are in the bindings of the training set
-        if (positiveExamplesCovered < positiveExampleWrappers.size())
-            positiveExamplesCovered += positiveExampleWrappers.stream().filter(exampleWrapper -> bindingInstances.contains(exampleWrapper.getExample())).count();
-        if ((null != negativeExampleWrappers) && (negativeExamplesCovered < negativeExampleWrappers.size()))
-            negativeExamplesCovered += negativeExampleWrappers.stream().filter(exampleWrapper -> bindingInstances.contains(exampleWrapper.getExample())).count();
-
-        double information = (double) positiveExamplesCovered / (positiveExamplesCovered + negativeExamplesCovered);
+        int positiveTuples = (int) temporaryTrainingSet.stream().
+                filter(ew -> ew.getCategory().equals(ExampleWrapper.CATEGORY_POSITIVE))
+                .count();
+        double information = (double) positiveTuples / temporaryTrainingSet.size();
 
         return new State(information, bgp, temporaryTrainingSet);
     }

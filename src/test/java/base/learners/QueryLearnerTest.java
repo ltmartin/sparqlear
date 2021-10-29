@@ -70,7 +70,7 @@ class QueryLearnerTest {
 
     @Test
     void positiveAndNegativeMultipleVariableExamples() {
-        String examples = "+(Igniacio, 1908-10-03) +(Rafi, 1903-07-01) -(plane, albert)";
+        String examples = "+(Igniacio, 1908-10-03) +(Rafi, 1903-07-01) -(Narayana, 1887)";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");

@@ -2,6 +2,7 @@ package base.domain;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 public class BindingWrapper {
     // Positive or Negative
@@ -32,5 +33,18 @@ public class BindingWrapper {
 
     public void setBindings(Map<String, String> bindings) {
         this.bindings = bindings;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        BindingWrapper that = (BindingWrapper) o;
+        return category.equals(that.category) && bindings.equals(that.bindings);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(category, bindings);
     }
 }
