@@ -10,6 +10,7 @@ import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.context.annotation.Scope;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
@@ -23,6 +24,7 @@ import java.util.stream.Stream;
 
 @Component
 @Lazy
+@Scope("prototype")
 public class QueryLearner {
     private final Logger logger = Logger.getLogger(QueryLearner.class.getName());
     @Resource
