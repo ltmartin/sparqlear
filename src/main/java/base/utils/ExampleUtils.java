@@ -51,7 +51,7 @@ public class ExampleUtils {
     }
 
     private boolean checkStructure(String examples) {
-        String pattern = "^((\\+|-){1}(([A-Za-z0-9\\-]+)|(\\([A-Za-z0-9\\-]+(,\\s[A-Za-z0-9\\-]+)+\\)))\\s?)+$";
+        String pattern = "^((\\+|-){1}(([A-Za-z0-9\\-\"@\\s.]+)|(\\([A-Za-z0-9\\-\"@\\s.]+(,\\s[A-Za-z0-9\\-\"@\\s.]+)+\\)))\\s?)+$";
         return examples.matches(pattern);
     }
 
@@ -63,5 +63,38 @@ public class ExampleUtils {
         }
 
         return result;
+    }
+
+    public static List<String> cleanExamples(List<ExampleWrapper> exampleWrappers){
+       List<String> cleanExamples = new LinkedList<>();
+
+        for (ExampleWrapper exampleWrapper : exampleWrappers) {
+            String example = exampleWrapper.getExample();
+            cleanExamples.add(cleanString(example));
+        }
+
+       return cleanExamples;
+    }
+
+    public static String cleanString(String _string){
+        _string = UtilsJena.removeLanguageAnnotation(_string);
+        _string = _string.replaceAll("\"", "");
+
+        return _string;
+    }
+
+    public static List<String> removeDoubleQuotes(List<String> list){
+        List<String> _list = new LinkedList<>();
+        for (String s : list) {
+            _list.add(s.replaceAll("\"", ""));
+        }
+        return _list;
+    }
+
+    public static List<String> removeDuplicates(List<String> list){
+        Set<String> noDuplicates = new HashSet<>(list);
+        list.clear();
+        list.addAll(noDuplicates);
+        return list;
     }
 }

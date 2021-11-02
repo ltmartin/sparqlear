@@ -37,6 +37,10 @@ public class QueryLearner {
     private UtilsJena utilsJena;
     @Value("${sparqlear.sparql.datasets}")
     private String datasets;
+    @Value("${sparqlear.information.threshold}")
+    private double informationThreshold;
+    @Value("${sparqlear.coverage.threshold}")
+    private double coverageThreshold;
 
     private Map<String, List<Triple>> triplesBySelectedVariable = new HashMap<>();
     private Map<String, Node> variableNames = new HashMap<>();
@@ -49,8 +53,10 @@ public class QueryLearner {
     public QueryLearner() {
         // this priority queue will prioritize the states where the sum of information and coverage is bigger.
         this.states = new PriorityQueue<>((state1, state2) -> {
-            if (((state1.getCoverage() + state1.getInformation()) < (state2.getCoverage()+ state2.getInformation()))) return 1;
-            if (((state1.getCoverage() + state1.getInformation()) > (state2.getCoverage()+ state2.getInformation()))) return -1;
+            if (((state1.getCoverage() + state1.getInformation()) < (state2.getCoverage() + state2.getInformation())))
+                return 1;
+            if (((state1.getCoverage() + state1.getInformation()) > (state2.getCoverage() + state2.getInformation())))
+                return -1;
 
             // if the information is the same, we think that a bgp with more triple patterns will be more explicative.
             return Integer.compare(state2.getBasicGraphPattern().getTriplePatterns().size(), state1.getBasicGraphPattern().getTriplePatterns().size());
@@ -126,7 +132,7 @@ public class QueryLearner {
                 BasicGraphPattern bgp = bestAchievedState.getBasicGraphPattern();
                 bgps.add(bgp);
                 removeCoveredExamplesFromTrainigSet(bgp);
-            } while (bestAchievedState.getCoverage() < 1);
+            } while (bestAchievedState.getCoverage() < coverageThreshold);
 
             derivedQueries.add(buildQuery(bgps));
         } else {
@@ -146,12 +152,12 @@ public class QueryLearner {
             List<String> bindingWrapperBindingsKeys = bindingWrapperBindings.keySet().stream().collect(Collectors.toList());
             for (int j = 0; j < bindingWrapperBindingsKeys.size(); j++) {
                 String key = bindingWrapperBindingsKeys.get(j);
-                if (keys.contains(key)){
+                if (keys.contains(key)) {
 
                     List<String> keyBindings = bindings.get(key);
                     for (int k = 0; k < keyBindings.size(); k++) {
                         String keyBinding = keyBindings.get(k);
-                        if ((null != bindingWrapperBindings.get(key)) && (keyBinding.contains(bindingWrapperBindings.get(key))))
+                        if ((null != bindingWrapperBindings.get(key)) && (keyBinding.equals(bindingWrapperBindings.get(key))))
                             bindingWrapperBindings.remove(key);
                     }
                 }
@@ -183,7 +189,7 @@ public class QueryLearner {
         for (ExampleEntry<String, Triple> cct : componentCandidateTriples) {
             boolean isExampleProvidedByUser = parsedExampleWrappers.stream().anyMatch(exampleWrapper -> exampleWrapper.getExample().equals(cct.getKey()));
 
-            if (UtilsJena.getCanonicalExample(cct.getValue().getObject().toString()).equals(cct.getKey())) {
+            if (UtilsJena.getCanonicalExample(cct.getValue().getObject().toString()).equals(UtilsJena.getCanonicalExample(cct.getKey()))) {
                 Node newSubject = null, newObject;
                 if (!variableNames.containsKey(cct.getKey())) {
                     if (isExampleProvidedByUser)
@@ -287,39 +293,56 @@ public class QueryLearner {
 
         temporaryTrainingSet = new LinkedList<>();
         createDeepCopy(trainingSet, temporaryTrainingSet);
-        State state = calculateInformation(cbgp, temporaryTrainingSet);
+        State state = computeInformation(cbgp, temporaryTrainingSet);
         computeCoverage(state);
         states.add(state);
 
-        LinkedList<BindingWrapper> trainingSetForMotifs = new LinkedList<>();
         for (Motif motifInstance : candidateMotifInstances) {
             // We save the training set created when the best triple patterns were chosen, and continue from there.
+            LinkedList<BindingWrapper> trainingSetForMotifs = new LinkedList<>();
             createDeepCopy(temporaryTrainingSet, trainingSetForMotifs);
+
             tryMotifInstance(motifInstance, cbgp, trainingSetForMotifs);
 
             // If the state contains a motif and it has maximum information and coverage return it.
-            if ((!states.peek().equals(state)) && (states.peek().getInformation() == 1) && (states.peek().getCoverage() == 1))
+            if ((!states.peek().equals(state)) && (states.peek().getInformation() >= informationThreshold) && (states.peek().getCoverage() >= coverageThreshold))
                 break;
         }
     }
 
     private void computeCoverage(State state) {
-        int positiveExamplesCovered = 0;
-        List<ExampleWrapper> positiveExampleWrappers = categorizedExamples.get(ExampleWrapper.CATEGORY_POSITIVE);
-        for (ExampleWrapper exampleWrapper : positiveExampleWrappers) {
-            for (BindingWrapper bindingWrapper : state.getTrainingSet()) {
-                if (bindingWrapper.getBindings().values().contains(exampleWrapper.getExample())){
-                    positiveExamplesCovered++;
-                    break;
+        // Obtaining the bindings of the BGP.
+        Map<String, List<String>> bindings = utilsJena.getBindings(state.getBasicGraphPattern());
+
+        // Extracting the bindings of the head variables.
+        Set<String> bindingsKeys = bindings.keySet();
+        Set<String> bindingValues = new HashSet<>();
+        for (String key : bindingsKeys) {
+            if (key.contains(Constants.HEAD_VARIABLE_PATTERN)) {
+                List<String> values = bindings.get(key);
+                for (String value : values) {
+                    bindingValues.add(UtilsJena.getCanonicalString(value));
                 }
             }
         }
 
+        // Counting the positive examples covered.
+        int positiveExamplesCovered = 0;
+        List<ExampleWrapper> positiveExampleWrappers = categorizedExamples.get(ExampleWrapper.CATEGORY_POSITIVE);
+        // removing strange characters
+        List<String> cleanExamples = ExampleUtils.cleanExamples(positiveExampleWrappers);
+
+        for (String example : cleanExamples) {
+            if (bindingValues.contains(example)) {
+                positiveExamplesCovered++;
+            }
+
+        }
         state.setCoverage((double) positiveExamplesCovered / positiveExampleWrappers.size());
     }
 
     // This method is necessary to avoid the default Java copy-by-reference behaviour.
-    private void createDeepCopy(List<BindingWrapper> trainingSet, LinkedList<BindingWrapper> temporaryTrainingSet) {
+    private void createDeepCopy(List<BindingWrapper> trainingSet, List<BindingWrapper> temporaryTrainingSet) {
         for (BindingWrapper item : trainingSet) {
             temporaryTrainingSet.add(new BindingWrapper(item.getCategory(), SerializationUtils.clone((HashMap) item.getBindings())));
         }
@@ -354,12 +377,14 @@ public class QueryLearner {
                 // Keeping a copy of the motif instance for the case I need to restore it.
                 Motif savedMotifInstance = motifInstance.clone();
                 BasicGraphPattern savedBgp = temporaryBgp.clone();
+                List<BindingWrapper> trainingSetForMotif = new LinkedList<>();
+                createDeepCopy(temporaryTrainingSet, trainingSetForMotif);
 
                 replaceConstantInMotifTriples(constant, motifInstance);
                 Set<Triple> bgpTriplePatterns = temporaryBgp.getTriplePatterns();
                 bgpTriplePatterns.addAll(UtilsJena.convertDomainTriplesToJenaTriples(motifInstance.getTriples()));
                 temporaryBgp.setTriplePatterns(bgpTriplePatterns);
-                State state = calculateInformation(temporaryBgp,temporaryTrainingSet);
+                State state = computeInformation(temporaryBgp, trainingSetForMotif);
                 computeCoverage(state);
                 state.setMotifInstance(motifInstance);
                 states.add(state);
@@ -376,7 +401,7 @@ public class QueryLearner {
             // The best state might not contain a motif. In order to explore further the motif instance
             // we choose the best motif instance we can find, and try to generate a better state using it.
             for (State s : states) {
-                if (null != s.getMotifInstance()){
+                if (null != s.getMotifInstance()) {
                     motifInstance = s.getMotifInstance();
                     break;
                 }
@@ -385,7 +410,7 @@ public class QueryLearner {
     }
 
     private void replaceConstantInMotifTriples(String constant, Motif motifInstance) {
-        if (!variableNames.containsKey(constant)){
+        if (!variableNames.containsKey(constant)) {
             variableNames.put(constant, NodeFactory.createVariable(Constants.EXISTENTIAL_VARIABLE_PATTERN + nsvIndex++));
         }
         Set<base.domain.Triple> motifTriples = motifInstance.getTriples();
@@ -439,10 +464,14 @@ public class QueryLearner {
             List<Triple> triplePatterns = candidateTriplesByDistinguishedVariable.get(distinguishedVariable);
             double bestInformation = 0.0;
             Triple bestTriple = null;
+
+            LinkedList<BindingWrapper> savedTemporaryTrainingSet = new LinkedList<>();
+            createDeepCopy(temporaryTrainingSet, savedTemporaryTrainingSet);
+
             for (Triple triple : triplePatterns) {
                 BasicGraphPattern bgp = new BasicGraphPattern();
                 bgp.setTriplePatterns(Stream.of(triple).collect(Collectors.toCollection(HashSet::new)));
-                State state = calculateInformation(bgp, temporaryTrainingSet);
+                State state = computeInformation(bgp, temporaryTrainingSet);
 
                 // If the new triple pattern improves the information, then it's the best one.
                 if (state.getInformation() > bestInformation) {
@@ -450,9 +479,12 @@ public class QueryLearner {
                     bestTriple = triple;
                 }
                 // If the information is the same, then we will decide based on some heuristics.
-                else if (state.getInformation() == bestInformation){
+                else if (state.getInformation() == bestInformation) {
                     bestTriple = Heuristics.chooseTriplePattern(bestTriplePatterns, triple, bestTriple);
                 }
+
+                temporaryTrainingSet = new LinkedList<>();
+                createDeepCopy(savedTemporaryTrainingSet, temporaryTrainingSet);
             }
             if (null != bestTriple)
                 bestTriplePatterns.add(bestTriple);
@@ -461,49 +493,79 @@ public class QueryLearner {
         return bestTriplePatterns;
     }
 
-    private State calculateInformation(BasicGraphPattern bgp, List<BindingWrapper> temporaryTrainingSet) {
+    private State computeInformation(BasicGraphPattern bgp, List<BindingWrapper> temporaryTrainingSet) {
         // Obtaining the bindings of the BGP
         Map<String, List<String>> bindings = utilsJena.getBindings(bgp);
 
         // removing any duplicates
-        Set<BindingWrapper> noDuplicates = new LinkedHashSet<>(temporaryTrainingSet);
+        Set<BindingWrapper> noDuplicates = new HashSet<>(temporaryTrainingSet);
         temporaryTrainingSet.clear();
         temporaryTrainingSet.addAll(noDuplicates);
 
         // Joining the training set with the bindings coming from the BGP
         for (int j = 0; j < temporaryTrainingSet.size(); j++) {
-            BindingWrapper exampleBinding = temporaryTrainingSet.get(j);
-            Set<String> keySet = exampleBinding.getBindings().keySet();
-            Set<String> distinguishedVariableKeys = keySet.stream().filter(key -> key.contains(Constants.HEAD_VARIABLE_PATTERN)).collect(Collectors.toSet());
-            for (String key : distinguishedVariableKeys) {
-                String bindingInTrainingSet = exampleBinding.getBindings().get(key);
-                List<String> bgpBindingsInstances = bindings.get(key);
-                if (null != bgpBindingsInstances) {
-                    boolean bindingInTrainingSetFound = false;
-                    for (int i = 0; i < bgpBindingsInstances.size(); i++) {
-                        if (bgpBindingsInstances.get(i).contains(bindingInTrainingSet)) {
-                            bindingInTrainingSetFound = true;
-                            Map<String, String> bindingsInTrainingSet = exampleBinding.getBindings();
-                            Set<String> bindingsKeys = bindings.keySet();
-                            for (String bindingKey : bindingsKeys) {
-                                if (!bindingsInTrainingSet.containsKey(bindingKey))
-                                    bindingsInTrainingSet.put(bindingKey, bindings.get(bindingKey).get(i));
-                            }
-                            exampleBinding.setBindings(bindingsInTrainingSet);
-                        }
+            BindingWrapper tuple = temporaryTrainingSet.get(j);
+            Set<String> tupleKeys = tuple.getBindings().keySet();
+            Set<String> bindingsKeys = bindings.keySet();
+            Set<String> commonKeys = Sets.intersection(bindingsKeys, tupleKeys).immutableCopy();
+            Set bindingsExtraKeys = Sets.difference(bindingsKeys, commonKeys).immutableCopy();
+
+            tryToJoin:
+            for (String _commonKey : commonKeys) {
+                List<String> bindingValues = bindings.get(_commonKey);
+                bindingValues = ExampleUtils.removeDoubleQuotes(bindingValues);
+                int i = bindingValues.indexOf(ExampleUtils.cleanString(tuple.getBindings().get(_commonKey)));
+                if (-1 != i){
+                    if (checkOtherKeys(_commonKey, commonKeys, bindings, tuple.getBindings())) {
+                        // extend tuple j of the training set adding the values coming from row i of the bindingValues
+                        extendTuple(temporaryTrainingSet, j, bindings, i, commonKeys, bindingsExtraKeys);
+                        break tryToJoin;
                     }
-                    if (!bindingInTrainingSetFound)
-                        temporaryTrainingSet.remove(exampleBinding);
                 }
+
+                temporaryTrainingSet.remove(j);
+                break;
             }
+
         }
 
         int positiveTuples = (int) temporaryTrainingSet.stream().
                 filter(ew -> ew.getCategory().equals(ExampleWrapper.CATEGORY_POSITIVE))
                 .count();
-        double information = (double) positiveTuples / temporaryTrainingSet.size();
 
-        return new State(information, bgp, temporaryTrainingSet);
+        if (temporaryTrainingSet.size() > 0) {
+            double information = (double) positiveTuples / temporaryTrainingSet.size();
+            return new State(information, bgp, temporaryTrainingSet);
+        }
+        return new State(0, bgp, temporaryTrainingSet);
+    }
+
+    private void extendTuple(List<BindingWrapper> temporaryTrainingSet, int j, Map<String, List<String>> bindings, int i, Set<String> commonKeys, Set<String> bindingsExtraKeys) {
+        Map<String, String> _tsBindings = temporaryTrainingSet.get(j).getBindings();
+        for (String _key : commonKeys) {
+            if (!_tsBindings.containsKey(_key))
+                _tsBindings.put(_key, bindings.get(_key).get(i));
+        }
+        for (String _key : bindingsExtraKeys) {
+            if (!_tsBindings.containsKey(_key))
+                _tsBindings.put(_key, bindings.get(_key).get(i));
+        }
+        temporaryTrainingSet.get(j).setBindings(_tsBindings);
+    }
+
+
+    private boolean checkOtherKeys(String commonKey, Set<String> commonKeys, Map<String, List<String>> bindings, Map<String, String> tupleBindings) {
+        for (String _key : commonKeys) {
+            if (commonKey.equals(_key))
+                continue;
+
+            List<String> bindingValues = bindings.get(_key);
+            bindingValues = ExampleUtils.removeDoubleQuotes(bindingValues);
+            if (!bindingValues.contains(ExampleUtils.cleanString(tupleBindings.get(_key))))
+                return false;
+        }
+
+        return true;
     }
 
 

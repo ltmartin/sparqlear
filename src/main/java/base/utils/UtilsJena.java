@@ -75,12 +75,13 @@ public class UtilsJena {
         example = example.replaceAll(">","");
         example = example.replaceAll("'", "");
         example = example.replaceAll("\"", "");
+        example = example.replaceAll("\\\\", "");
 
         return example;
     }
 
     public static String getSparqlCompatibleExample(String example) {
-        return UrlValidator.getInstance().isValid(example) ? "<" + example + ">" : "'" + example + "'";
+        return UrlValidator.getInstance().isValid(example) ? "<" + example + ">" : example.contains("\"")? example : "'" + example + "'";
     }
 
     public String getSparqlCompatibleTriple(Triple value) {
@@ -180,13 +181,13 @@ public class UtilsJena {
                 Iterator<Var> varIterator = binding.vars();
                 while (varIterator.hasNext()){
                     Var variable = varIterator.next();
-                    if (!results.containsKey(variable.toString())){
+                    if (!results.containsKey(variable.toString().replace(Constants.PROJECTION_PATTERN, ""))){
                         String variableBinding = binding.get(variable).toString();
-                        results.put(variable.toString(), Stream.of(variableBinding).collect(Collectors.toList()));
+                        results.put(variable.toString().replace(Constants.PROJECTION_PATTERN, ""), Stream.of(variableBinding).collect(Collectors.toList()));
                     } else {
-                        List<String> variableBindings = results.get(variable.toString());
+                        List<String> variableBindings = results.get(variable.toString().replace(Constants.PROJECTION_PATTERN, ""));
                         variableBindings.add(binding.get(variable).toString());
-                        results.replace(variable.toString(), variableBindings);
+                        results.replace(variable.toString().replace(Constants.PROJECTION_PATTERN, ""), variableBindings);
                     }
                 }
             }
@@ -219,7 +220,7 @@ public class UtilsJena {
         builder.append("SELECT ");
 
         for (String variable : variables) {
-            builder.append(variable + " ");
+            builder.append("(str(" + variable + ") as " + variable + Constants.PROJECTION_PATTERN + ") ");
         }
 
         builder.append("WHERE { ");

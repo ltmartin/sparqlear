@@ -18,7 +18,7 @@ class QueryLearnerTest {
 
     @Test
     void allPositiveSingleVariableExamples() {
-        String examples = "+Rafi +Sergey +Igniacio";
+        String examples = "+\"Rafi Muhammad Chaudhry\"@en +\"Sergey Psakhie\"@en +\"Igniacio Matte Blanco\"@en";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");
@@ -35,7 +35,7 @@ class QueryLearnerTest {
 
     @Test
     void positiveAndNegativeSingleVariableExamples() {
-        String examples = "+Rafi +Sergey +Igniacio -Italian";
+        String examples = "+\"Rafi Muhammad Chaudhry\"@en +\"Sergey Psakhie\"@en +\"Igniacio Matte Blanco\"@en -Italian";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");
@@ -52,7 +52,7 @@ class QueryLearnerTest {
 
     @Test
     void positiveMultipleVariableExamples() {
-        String examples = "+(Igniacio, 1908-10-03) +(Rafi, 1903-07-01)";
+        String examples = "+(\"Igniacio Matte Blanco\"@en, 1908-10-03) +(\"Rafi Muhammad Chaudhry\"@en, 1903-07-01)";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");
@@ -70,7 +70,7 @@ class QueryLearnerTest {
 
     @Test
     void positiveAndNegativeMultipleVariableExamples() {
-        String examples = "+(Igniacio, 1908-10-03) +(Rafi, 1903-07-01) -(Narayana, 1887)";
+        String examples = "+(\"Igniacio Matte Blanco\"@en, 1908-10-03) +(\"Rafi Muhammad Chaudhry\"@en, 1903-07-01) -(\"A. L. Narayana\"@en, 1887)";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");
@@ -88,7 +88,7 @@ class QueryLearnerTest {
 
     @Test
     void positiveMultipleVariableExamples2() {
-        String examples = "+(Frances, American, 2000-12-27) +(Peter, American, 2010-03-30) +(Lindsay, Australian, 1970-09-12)";
+        String examples = "+(\"Frances Estelle Jones Bonner\"@en, \"United States\"@en, 2000-12-27) +(\"Peter Karter\"@en, \"United States\"@en, 2010-03-30) +(\"Lindsay Stuart Smith\"@en, \"Australian\"@en, 1970-09-12)";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");
