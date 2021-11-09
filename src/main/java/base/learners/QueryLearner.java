@@ -102,10 +102,13 @@ public class QueryLearner {
         }
 
         // Finding the candidate motif instances involving individuals from the candidate triples
-        Set<Motif> candidateMotifInstances = new HashSet<>();
+        List<Motif> candidateMotifInstances = new LinkedList<>();
         for (String ind : individuals) {
             candidateMotifInstances.addAll(motifsService.findMotifsInvolvingIndividual(ind));
         }
+
+        // Sorting all the motif instances to avoid randomness
+        candidateMotifInstances.sort(Comparator.comparing(Motif::getId));
 
         if (null == parsedDatasets) {
             // Creating the candidate triple patterns
@@ -281,7 +284,7 @@ public class QueryLearner {
         return stringBuilder.toString();
     }
 
-    private void constructBasicGraphPattern(Map<ExampleWrapper, Set<ExampleEntry<String, Triple>>> candidateTriplePatterns, Set<Motif> candidateMotifInstances) {
+    private void constructBasicGraphPattern(Map<ExampleWrapper, Set<ExampleEntry<String, Triple>>> candidateTriplePatterns, List<Motif> candidateMotifInstances) {
         BasicGraphPattern bgp = new BasicGraphPattern();
         Map<String, List<Triple>> candidateTriplesByDistinguishedVariable = groupCandidateTriplesByDistinguishedVariable(candidateTriplePatterns);
 

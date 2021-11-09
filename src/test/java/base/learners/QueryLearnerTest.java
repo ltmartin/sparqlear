@@ -103,4 +103,22 @@ class QueryLearnerTest {
             e.printStackTrace();
         }
     }
+
+    @Test
+    void join() {
+        String examples = "+(\"Frances Estelle Jones Bonner\"@en) +(\"Peter Karter\"@en) +(\"Lindsay Stuart Smith\"@en) +(1736-01-19) +(1744-08-15) +(1760-10-23)";
+        try {
+            Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
+            System.out.println("===================================================");
+            System.out.println("Result: ");
+            if (!learnedQueries.isPresent())
+                System.out.println("Nothing learned.");
+            else
+                learnedQueries.stream().forEach(System.out::println);
+
+            System.out.println("===================================================");
+        } catch (ParseException | IOException e) {
+            e.printStackTrace();
+        }
+    }
 }
