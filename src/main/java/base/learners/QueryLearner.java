@@ -332,18 +332,33 @@ public class QueryLearner {
         }
 
         // Counting the positive examples covered.
-        int positiveExamplesCovered = 0;
-        List<ExampleWrapper> positiveExampleWrappers = categorizedExamples.get(ExampleWrapper.CATEGORY_POSITIVE);
-        // removing strange characters
-        List<String> cleanExamples = ExampleUtils.cleanExamples(positiveExampleWrappers);
+        int positiveExamplesCovered, positiveExamplesInTrainingSet = 0;
 
-        for (String example : cleanExamples) {
-            if (bindingValues.contains(example)) {
-                positiveExamplesCovered++;
-            }
-
+        List<BindingWrapper> positiveTuplesInTrainingSet = trainingSet.stream()
+                .filter(bindingWrapper -> bindingWrapper.getCategory().equals(ExampleWrapper.CATEGORY_POSITIVE))
+                .collect(Collectors.toList());
+        List<String> valuesInPositiveTuplesList = new LinkedList<>();
+        for (BindingWrapper _tuple : positiveTuplesInTrainingSet) {
+            valuesInPositiveTuplesList.addAll(_tuple.getBindings().values());
         }
-        state.setCoverage((double) positiveExamplesCovered / positiveExampleWrappers.size());
+
+        // boilerplate code to remove strange characters and duplicates
+        for (int i = 0; i < valuesInPositiveTuplesList.size(); i++) {
+            String _value = valuesInPositiveTuplesList.get(0);
+            valuesInPositiveTuplesList.remove(0);
+            valuesInPositiveTuplesList.add(ExampleUtils.cleanString(_value));
+        }
+        Set<String> valuesInPositiveTuples = new HashSet<>();
+        valuesInPositiveTuples.addAll(valuesInPositiveTuplesList);
+
+        positiveExamplesCovered = Sets.intersection(valuesInPositiveTuples, bindingValues).size();
+
+        Set<ExampleWrapper> positiveUserExamples = categorizedExamples.get(ExampleWrapper.CATEGORY_POSITIVE).stream()
+                .collect(Collectors.toSet());
+        Set<String> positiveUserExamplesValues = ExampleUtils.cleanExamples(positiveUserExamples);
+        positiveExamplesInTrainingSet = Sets.intersection(positiveUserExamplesValues, valuesInPositiveTuples).size();
+
+        state.setCoverage((double) positiveExamplesCovered / positiveExamplesInTrainingSet);
     }
 
     // This method is necessary to avoid the default Java copy-by-reference behaviour.

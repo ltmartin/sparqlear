@@ -65,13 +65,13 @@ public class ExampleUtils {
         return result;
     }
 
-    public static List<String> cleanExamples(List<ExampleWrapper> exampleWrappers){
-       List<String> cleanExamples = new LinkedList<>();
+    public static Set<String> cleanExamples(Set<ExampleWrapper> exampleWrappers){
+        Set<String> cleanExamples = new HashSet<>();
 
-        for (ExampleWrapper exampleWrapper : exampleWrappers) {
-            String example = exampleWrapper.getExample();
-            cleanExamples.add(cleanString(example));
-        }
+            for (ExampleWrapper exampleWrapper : exampleWrappers) {
+                String example = exampleWrapper.getExample();
+                cleanExamples.add(cleanString(example));
+            }
 
        return cleanExamples;
     }
