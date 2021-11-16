@@ -39,8 +39,8 @@ public class QueryLearner {
     private UtilsJena utilsJena;
     @Value("${sparqlear.sparql.datasets}")
     private String datasets;
-    @Value("${sparqlear.information.threshold}")
-    private double informationThreshold;
+    @Value("${sparqlear.improvement.threshold}")
+    private double improvementThreshold;
     @Value("${sparqlear.coverage.threshold}")
     private double coverageThreshold;
 
@@ -137,6 +137,7 @@ public class QueryLearner {
                 BasicGraphPattern bgp = bestAchievedState.getBasicGraphPattern();
                 bgps.add(bgp);
                 removeCoveredExamplesFromTrainigSet(bgp);
+
             } while (bestAchievedState.getCoverage() < coverageThreshold);
 
             derivedQueries.add(buildQuery(bgps));
@@ -162,13 +163,13 @@ public class QueryLearner {
                     List<String> keyBindings = bindings.get(key);
                     for (int k = 0; k < keyBindings.size(); k++) {
                         String keyBinding = keyBindings.get(k);
-                        if ((null != bindingWrapperBindings.get(key)) && (keyBinding.equals(bindingWrapperBindings.get(key))))
+                        if ((null != bindingWrapperBindings.get(key)) && (ExampleUtils.cleanString(keyBinding).equals(ExampleUtils.cleanString(bindingWrapperBindings.get(key)))))
                             bindingWrapperBindings.remove(key);
                     }
                 }
             }
             if (bindingWrapperBindings.isEmpty())
-                trainingSet.remove(i);
+                trainingSet.remove(i--);
         }
     }
 
@@ -310,9 +311,27 @@ public class QueryLearner {
             tryMotifInstance(motifInstance, cbgp, trainingSetForMotifs);
 
             // If the state contains a motif and it has maximum information and coverage return it.
-            if ((!states.peek().equals(state)) && (states.peek().getInformation() >= informationThreshold) && (states.peek().getCoverage() >= coverageThreshold))
+            if ((!states.peek().equals(state)) && (states.peek().getInformation() == 1) && (states.peek().getCoverage() == 1))
+                break;
+
+            if (!enoughImprovement())
                 break;
         }
+    }
+
+    private boolean enoughImprovement() {
+        List<State> stateList = states.stream().collect(Collectors.toList());
+        if (stateList.size() < 11)
+            return true;
+
+        for (int i = 0; i < 10; i++){
+
+            double information = (stateList.get(i).getInformation() - stateList.get(i+1).getInformation())/Double.max(stateList.get(i).getInformation(), stateList.get(i+1).getInformation());
+            double coverage =  (stateList.get(i).getCoverage() - stateList.get(i+1).getCoverage())/Double.max(stateList.get(i+1).getCoverage(), stateList.get(i+1).getCoverage());
+            if (Double.max(information, coverage) >= improvementThreshold)
+                return true;
+        }
+        return false;
     }
 
     private void computeCoverage(State state) {
@@ -543,7 +562,7 @@ public class QueryLearner {
                     }
                 }
 
-                temporaryTrainingSet.remove(j);
+                temporaryTrainingSet.remove(j--);
                 break;
             }
 

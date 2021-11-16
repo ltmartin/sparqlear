@@ -106,7 +106,7 @@ class QueryLearnerTest {
 
     @Test
     void join() {
-        String examples = "+(\"Frances Estelle Jones Bonner\"@en) +(\"Peter Karter\"@en) +(\"Lindsay Stuart Smith\"@en) +(1736-01-19) +(1744-08-15) +(1760-10-23)";
+        String examples = "+\"Frances Estelle Jones Bonner\"@en +\"Peter Karter\"@en +\"Lindsay Stuart Smith\"@en +1736-01-19 +1744-08-15 +1760-10-23";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");
