@@ -55,15 +55,18 @@ public class QueryLearner {
     public QueryLearner() {
         // this priority queue will prioritize the states where the sum of information and coverage is bigger.
         this.states = new PriorityQueue<>((state1, state2) -> {
-            if (((state1.getCoverage() + state1.getInformation()) < (state2.getCoverage() + state2.getInformation())))
-                return 1;
-            if (((state1.getCoverage() + state1.getInformation()) > (state2.getCoverage() + state2.getInformation())))
-                return -1;
+            if (((state1.getInformation() != 0) || (state1.getCoverage() != 0)) && ((state2.getInformation() != 0) || (state2.getCoverage() != 0))){
+                double f1_state1 = computeF1(state1);
+                double f1_state2 = computeF1(state2);
+                return Double.compare(f1_state1, f1_state2) * -1;
+            }
 
-            // if the information is the same, we think that a bgp with more triple patterns will be more explicative.
-            return Integer.compare(state2.getBasicGraphPattern().getTriplePatterns().size(), state1.getBasicGraphPattern().getTriplePatterns().size());
-
+            return 0;
         });
+    }
+
+    private double computeF1(State state) {
+        return 2 * ((state.getInformation() * state.getCoverage()) / (state.getInformation() + state.getCoverage()));
     }
 
     public Optional<Set<String>> learn(String examples) throws ParseException, IOException {
