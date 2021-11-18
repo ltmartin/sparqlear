@@ -286,7 +286,6 @@ public class QueryLearner {
     }
 
     private void constructBasicGraphPattern(Map<ExampleWrapper, Set<ExampleEntry<String, Triple>>> candidateTriplePatterns, List<Motif> candidateMotifInstances) {
-        BasicGraphPattern bgp = new BasicGraphPattern();
         Map<String, List<Triple>> candidateTriplesByDistinguishedVariable = groupCandidateTriplesByDistinguishedVariable(candidateTriplePatterns);
 
         // Creating a copy of the training set, so we can return to the original one.
@@ -326,8 +325,8 @@ public class QueryLearner {
 
         for (int i = 0; i < 10; i++){
 
-            double information = (stateList.get(i).getInformation() - stateList.get(i+1).getInformation())/Double.max(stateList.get(i).getInformation(), stateList.get(i+1).getInformation());
-            double coverage =  (stateList.get(i).getCoverage() - stateList.get(i+1).getCoverage())/Double.max(stateList.get(i+1).getCoverage(), stateList.get(i+1).getCoverage());
+            double information = Math.abs(stateList.get(i).getInformation() - stateList.get(i+1).getInformation())/Double.max(stateList.get(i).getInformation(), stateList.get(i+1).getInformation());
+            double coverage =  Math.abs(stateList.get(i).getCoverage() - stateList.get(i+1).getCoverage())/Double.max(stateList.get(i+1).getCoverage(), stateList.get(i+1).getCoverage());
             if (Double.max(information, coverage) >= improvementThreshold)
                 return true;
         }
