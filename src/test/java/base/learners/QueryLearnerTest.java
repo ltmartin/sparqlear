@@ -142,6 +142,25 @@ class QueryLearnerTest {
     }
 
     @Test
+    void positiveAndNegativeMultipleVariableExamples3() {
+        String examples = "+(\"Frances Estelle Jones Bonner\"@en, 2000-12-27) +(\"Peter Karter\"@en, 2010-03-30) -(\"Lindsay Stuart Smith\"@en, 1970-09-12) " +
+                "-(\"Yoshimasa Hirata\"@en, 2000-03-05) -(\"A. B. Walawalkar\"@en, 1970-12-23)";
+        try {
+            Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
+            System.out.println("===================================================");
+            System.out.println("Result: ");
+            if (!learnedQueries.isPresent())
+                System.out.println("Nothing learned.");
+            else
+                learnedQueries.stream().forEach(System.out::println);
+
+            System.out.println("===================================================");
+        } catch (ParseException | IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
     void positiveAndNegativeMultipleVariableExamples2() {
         String examples = "+(\"Alan Wilfred Bishop\"@en, \"United Kingdom\"@en, 1920-05-27) +(\"Sir Alec Westley Skempton\"@en, \"United Kingdom\"@en, 1914-06-04) " +
                 "-(\"Igniacio Matte Blanco\"@en, \"Italian\"@en, 1908-10-03) -(\"Paula Hyman\"@en, \"USA\"@en, 1946-09-30) -(\"Than Tun\"@en, \"Burmese\"@en, 1923-04-06)";
