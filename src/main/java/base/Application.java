@@ -36,19 +36,23 @@ public class Application implements CommandLineRunner {
         System.out.println("Please, enter the examples:");
 
         Scanner scanner = new Scanner(System.in);
-        String examples = scanner.nextLine();
+        while (scanner.hasNextLine()) {
+            String examples = scanner.nextLine();
+            System.out.println(examples);
+            // Piece of code to get a clean instance of the Spring bean
+            learner = learner.getLearner();
 
-        Optional<Set<String>> learnedQueries = learner.learn(examples);
+            Optional<Set<String>> learnedQueries = learner.learn(examples);
 
-        clearConsole();
-        System.out.println("===================================================");
-        System.out.println("Result: ");
-        if (!learnedQueries.isPresent())
-            System.out.println("Nothing learned.");
-        else
-            learnedQueries.stream().forEach(System.out::println);
+            System.out.println("===================================================");
+            System.out.println("Result: ");
+            if (!learnedQueries.isPresent())
+                System.out.println("Nothing learned.");
+            else
+                learnedQueries.stream().forEach(System.out::println);
 
-        System.out.println("===================================================");
+            System.out.println("===================================================");
+        }
     }
 
     private void clearConsole(){

@@ -8,6 +8,7 @@ import org.apache.commons.lang3.SerializationUtils;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
+import org.springframework.beans.factory.annotation.Lookup;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.context.annotation.Scope;
@@ -656,4 +657,9 @@ public class QueryLearner {
         return candidateTriples;
     }
 
+    // Piece of code to provide a clean instance of the Spring bean
+    @Lookup
+    public QueryLearner getLearner(){
+        return null;
+    }
 }
