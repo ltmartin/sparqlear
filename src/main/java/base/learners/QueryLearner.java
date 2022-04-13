@@ -504,7 +504,7 @@ public class QueryLearner {
         Set<String> distinguishedVariablesKeySet = candidateTriplesByDistinguishedVariable.keySet();
         for (String distinguishedVariable : distinguishedVariablesKeySet) {
             List<Triple> triplePatterns = candidateTriplesByDistinguishedVariable.get(distinguishedVariable);
-            double bestInformation = 0.0;
+            double bestInformation = -1.0;
             Triple bestTriple = null;
 
             LinkedList<BindingWrapper> savedTemporaryTrainingSet = new LinkedList<>();
