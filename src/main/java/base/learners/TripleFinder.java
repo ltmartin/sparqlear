@@ -37,6 +37,7 @@ public class TripleFinder {
                     .map(t -> new ExampleEntry<>(example, (Triple) t))
                     .collect(Collectors.toCollection(HashSet::new));
         } catch (IOException e) {
+            e.printStackTrace();
             throw new IOException("Please check the endpoint and dataset parameters.");
         }
 

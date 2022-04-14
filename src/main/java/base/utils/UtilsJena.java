@@ -53,8 +53,8 @@ public class UtilsJena {
      * @return Set<Triple> containing the derived triples.
      */
     public Set deriveTriples(String example, Optional<String> dataset, int limit, int offset) throws IOException {
-        if (!UrlValidator.getInstance().isValid(endpoint))
-            throw new IOException("Invalid endpoint");
+        /*if (!UrlValidator.getInstance().isValid(endpoint))
+            throw new IOException("Invalid endpoint");*/
 
         // If the example is an URI it should be between <> or between quotes otherwise.
         example = getSparqlCompatibleExample(example);

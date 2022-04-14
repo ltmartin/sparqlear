@@ -35,7 +35,7 @@ public class Application implements CommandLineRunner {
         System.out.println("+(component1, component2, componentN) -(component1, component2, componentN)");
         System.out.println("Please, enter the examples:");
 
-        Scanner scanner = new Scanner(System.in);
+        Scanner scanner = new Scanner(System.in, "utf-8");
         while (scanner.hasNextLine()) {
             String examples = scanner.nextLine();
             System.out.println(examples);

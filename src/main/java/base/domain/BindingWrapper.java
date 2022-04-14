@@ -47,4 +47,12 @@ public class BindingWrapper {
     public int hashCode() {
         return Objects.hash(category, bindings);
     }
+
+    @Override
+    public String toString() {
+        return "BindingWrapper{" +
+                "category=" + ((category == false)? "Negative" : "Positive") +
+                ", bindings=" + bindings +
+                '}';
+    }
 }

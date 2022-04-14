@@ -1,0 +1,8 @@
++"Rafi Muhammad Chaudhry"@en +"Sergey Psakhie"@en +"Igniacio Matte Blanco"@en
++"Rafi Muhammad Chaudhry"@en +"Sergey Psakhie"@en +"Igniacio Matte Blanco"@en -Italian
++("Igniacio Matte Blanco"@en, 1908-10-03) +("Rafi Muhammad Chaudhry"@en, 1903-07-01)
++("Igniacio Matte Blanco"@en, 1908-10-03) +("Rafi Muhammad Chaudhry"@en, 1903-07-01) -("A. L. Narayana"@en, 1887)
++("Frances Estelle Jones Bonner"@en, "United States"@en, 2000-12-27) +("Peter Karter"@en, "United States"@en, 2010-03-30) +("Lindsay Stuart Smith"@en, "Australian"@en, 1970-09-12)
++"Frances Estelle Jones Bonner"@en +"Peter Karter"@en +"Lindsay Stuart Smith"@en +1736-01-19 +1744-08-15 +1760-10-23
++("Frances Estelle Jones Bonner"@en, "United States"@en, 2000-12-27) +("Peter Karter"@en, "United States"@en, 2010-03-30) -("Lindsay Stuart Smith"@en, "Australian"@en, 1970-09-12) -("Yoshimasa Hirata"@en, "Japanese"@en, 2000-03-05) -("A. B. Walawalkar"@en, "India"@en, 1970-12-23)
++("Alan Wilfred Bishop"@en, "United Kingdom"@en, 1920-05-27) +("Sir Alec Westley Skempton"@en, "United Kingdom"@en, 1914-06-04) -("Igniacio Matte Blanco"@en, "Italian"@en, 1908-10-03) -("Paula Hyman"@en, "USA"@en, 1946-09-30) -("Than Tun"@en, "Burmese"@en, 1923-04-06)

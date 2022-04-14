@@ -12,29 +12,33 @@ services:
       context: .
       dockerfile: Dockerfile
     image: ltmartin/sparqlear:latest
+    container_name: sparqlear
     restart: on-failure
+    tty: true
+    stdin_open: true
+    volumes:
+    - ./data:/sparqlear/data
 
   virtuoso:
     image: openlink/virtuoso-opensource-7:latest
     restart: always
     volumes:
-    - /home/leandro/Installations/virtuoso-opensource/database:/database
+    - virtuoso-database:/database
     ports:
     - "8890:8890"
 
   postgres:
-    image: postgres:latest
+    image: postgres:14.2-alpine
     restart: always
     ports:
-    - 5432:5432
+    - "5432:5432"
     environment:
       POSTGRES_PASSWORD: example
       POSTGRES_USER: converter
     volumes:
-      - /home/leandro/Workspace/Package/postgres_container/postgresdb:/var/lib/postgresql/data
-
-  adminer:
-    image: adminer
-    restart: always
-    ports:
-      - 8080:8080
+      - postgres-database:/var/lib/postgresql/data
+volumes:
+  postgres-database:
+    external: true
+  virtuoso-database:
+    external: true

@@ -97,7 +97,8 @@ public class QueryLearner {
 
         // Extracting the subjects of the candidate triples
         Set<String> individuals = new HashSet<>();
-        assert candidateTriples != null;
+        if (null == candidateTriples)
+            return Optional.empty();
         for (Map.Entry<ExampleWrapper, Set<ExampleEntry<String, Triple>>> entry : candidateTriples.entrySet()) {
             Set<ExampleEntry<String, Triple>> value = entry.getValue();
             for (ExampleEntry<String, Triple> exampleEntry : value) {
@@ -127,6 +128,10 @@ public class QueryLearner {
                 constructBasicGraphPattern(candidateTriples, candidateMotifInstances);
                 bestAchievedState = states.poll();
 
+                BasicGraphPattern bgp = bestAchievedState.getBasicGraphPattern();
+                bgps.add(bgp);
+                removeCoveredExamplesFromTrainigSet(bgp);
+
                 if (null != bestAchievedState.getMotifInstance()) {
                     // Printing some values for experimentation purposes.
                     System.out.println("==============================================");
@@ -136,11 +141,9 @@ public class QueryLearner {
                 System.out.println("==============================================");
                 System.out.println("Information: " + bestAchievedState.getInformation());
                 System.out.println("Coverage: " + bestAchievedState.getCoverage());
+                System.out.println("Best query up to this point: " + buildQuery(bgps));
+                System.out.println("Current training set: " + trainingSet);
                 System.out.println("==============================================");
-
-                BasicGraphPattern bgp = bestAchievedState.getBasicGraphPattern();
-                bgps.add(bgp);
-                removeCoveredExamplesFromTrainigSet(bgp);
 
             } while (bestAchievedState.getCoverage() < coverageThreshold);
 
