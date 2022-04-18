@@ -285,4 +285,14 @@ public class UtilsJena {
         }
         return triples;
     }
+
+    public static Set<base.domain.Triple> convertJenaTriplesToDomainTriples(Set<Triple> jenaTriples){
+        Set<base.domain.Triple> triples = new HashSet<>();
+
+        for (Triple triple : jenaTriples) {
+            triples.add(new base.domain.Triple(triple.getSubject().toString(), triple.getPredicate().toString(), triple.getObject().toString()));
+        }
+
+        return triples;
+    }
 }

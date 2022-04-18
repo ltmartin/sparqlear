@@ -425,8 +425,8 @@ public class QueryLearner {
                 List<BindingWrapper> trainingSetForMotif = new LinkedList<>();
                 createDeepCopy(temporaryTrainingSet, trainingSetForMotif);
 
-                replaceConstantInMotifTriples(constant, motifInstance);
-                Set<Triple> bgpTriplePatterns = temporaryBgp.getTriplePatterns();
+                motifInstance.setTriples(replaceConstantInTriples(constant, motifInstance.getTriples()));
+                Set<Triple> bgpTriplePatterns = UtilsJena.convertDomainTriplesToJenaTriples(replaceConstantInTriples(constant, UtilsJena.convertJenaTriplesToDomainTriples(temporaryBgp.getTriplePatterns())));
                 bgpTriplePatterns.addAll(UtilsJena.convertDomainTriplesToJenaTriples(motifInstance.getTriples()));
                 temporaryBgp.setTriplePatterns(bgpTriplePatterns);
                 State state = computeInformation(temporaryBgp, trainingSetForMotif);
@@ -454,14 +454,13 @@ public class QueryLearner {
         }
     }
 
-    private void replaceConstantInMotifTriples(String constant, Motif motifInstance) {
+    private Set<base.domain.Triple> replaceConstantInTriples(String constant, Set<base.domain.Triple> triples) {
         if (!variableNames.containsKey(constant)) {
             variableNames.put(constant, NodeFactory.createVariable(Constants.EXISTENTIAL_VARIABLE_PATTERN + nsvIndex++));
         }
-        Set<base.domain.Triple> motifTriples = motifInstance.getTriples();
         Set<base.domain.Triple> newTriplePatterns = new HashSet<>();
 
-        for (base.domain.Triple triple : motifTriples) {
+        for (base.domain.Triple triple : triples) {
             String tripleSubject = UtilsJena.getCanonicalString(triple.getSubject());
             if (tripleSubject.equals(constant))
                 triple.setSubject(variableNames.get(constant).toString());
@@ -470,7 +469,7 @@ public class QueryLearner {
                 triple.setObject(variableNames.get(constant).toString());
             newTriplePatterns.add(triple);
         }
-        motifInstance.setTriples(newTriplePatterns);
+        return newTriplePatterns;
     }
 
 

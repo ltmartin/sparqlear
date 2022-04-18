@@ -1,4 +1,12 @@
-target/*
+target/classes
+target/generated-sources
+target/generated-test-sources
+target/maven-archiver
+target/maven-status
+target/surefire
+target/surefire-reports
+target/test-classes
+target/sparqlear-1.0.0.jar.original
 *.iml
 .idea/*
 output.txt
