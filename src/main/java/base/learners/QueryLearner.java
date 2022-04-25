@@ -506,7 +506,7 @@ public class QueryLearner {
         Set<String> distinguishedVariablesKeySet = candidateTriplesByDistinguishedVariable.keySet();
         for (String distinguishedVariable : distinguishedVariablesKeySet) {
             List<Triple> triplePatterns = candidateTriplesByDistinguishedVariable.get(distinguishedVariable);
-            double bestInformation = -1.0;
+            double bestInformation = 0.0;
             Triple bestTriple = null;
 
             LinkedList<BindingWrapper> savedTemporaryTrainingSet = new LinkedList<>();
@@ -523,7 +523,7 @@ public class QueryLearner {
                     bestTriple = triple;
                 }
                 // If the information is the same, then we will decide based on some heuristics.
-                else if (state.getInformation() == bestInformation) {
+                else if ((state.getInformation() == bestInformation) && (null != bestTriple)) {
                     bestTriple = Heuristics.chooseTriplePattern(bestTriplePatterns, triple, bestTriple);
                 }
 
