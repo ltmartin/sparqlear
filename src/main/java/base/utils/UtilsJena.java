@@ -204,6 +204,44 @@ public class UtilsJena {
         return results;
     }
 
+    public Map<String, List<String>> getBindingsValues(BasicGraphPattern bgp, Map<String, List<String>> values){
+        String query = buildSelectQueryValues(bgp, values);
+
+        Map<String, List<String>> results = new HashMap<>();
+
+        try (QueryExecution qexec = QueryExecution.service(endpoint).query(query).timeout(timeout, TimeUnit.MINUTES).build()) {
+            ResultSet rs = qexec.execSelect();
+            while (rs.hasNext()) {
+                Binding binding = rs.nextBinding();
+                Iterator<Var> varIterator = binding.vars();
+                while (varIterator.hasNext()){
+                    Var variable = varIterator.next();
+                    if (!results.containsKey(variable.toString())){
+                        String variableBinding = binding.get(variable).toString();
+                        results.put(variable.toString(), Stream.of(variableBinding)
+                                        .map(b -> b.replaceAll("\"", ""))
+                                        .collect(Collectors.toList()));
+                    } else {
+                        List<String> variableBindings = results.get(variable.toString());
+                        variableBindings.add(binding.get(variable).toString().replaceAll("\"", ""));
+                        results.replace(variable.toString(), variableBindings);
+                    }
+                }
+            }
+        } catch (QueryParseException e) {
+            System.out.println("===============================================");
+            logger.log(Level.SEVERE, "Error processing the bindings of the query: \n" + query + "\n");
+            System.out.println("===============================================");
+            throw e;
+        } catch (Exception e) {
+            System.out.println("===============================================");
+            logger.log(Level.SEVERE, "It has occurred an external error processing the bindings of the query: \n" + query + "\n");
+            System.out.println("===============================================");
+        }
+
+        return results;
+    }
+
     private String buildSelectQuery(BasicGraphPattern bgp){
         Set<String> variables = new HashSet<>();
         for (Triple triple : bgp.getTriplePatterns()) {
@@ -230,6 +268,60 @@ public class UtilsJena {
 
         builder.append(" }");
 
+        return builder.toString();
+    }
+
+    private String buildSelectQueryValues(BasicGraphPattern bgp, Map<String, List<String>> values){
+        Set<String> variables = new HashSet<>();
+        for (Triple triple : bgp.getTriplePatterns()) {
+            String tripleSubject = triple.getSubject().toString();
+            String tripleObject = triple.getObject().toString();
+
+            if (tripleSubject.contains("?"+ Constants.HEAD_VARIABLE_PATTERN) || tripleSubject.contains("?"+ Constants.EXISTENTIAL_VARIABLE_PATTERN))
+                variables.add(tripleSubject);
+            if (tripleObject.contains("?"+ Constants.HEAD_VARIABLE_PATTERN) || tripleObject.contains("?"+ Constants.EXISTENTIAL_VARIABLE_PATTERN))
+                variables.add(tripleObject);
+        }
+
+        StringBuilder builder = new StringBuilder();
+        builder.append("SELECT ");
+
+        for (String variable : variables) {
+            builder.append(variable + " ");
+        }
+
+        builder.append("WHERE { ");
+        for (Triple triple : bgp.getTriplePatterns()) {
+            builder.append(getSparqlCompatibleTriple(triple) + " .");
+        }
+
+        builder.append(" }");
+
+        builder.append(" VALUES (");
+
+        List<Tuple> tuples = new LinkedList<>();
+
+        for (Map.Entry<String, List<String>> entry : values.entrySet())
+            if (variables.contains(entry.getKey())) {
+                builder.append(entry.getKey() + " ");
+                List<String> elements = entry.getValue();
+                if (tuples.isEmpty())
+                    elements.forEach( e -> tuples.add(new Tuple(e)));
+                else {
+                    int entryIndex = 0;
+                    for (String e : elements) {
+                        tuples.get(entryIndex++).addItem(e);
+                    }
+                }
+            }
+
+        builder.append(") { ");
+
+        for (Tuple t : tuples) {
+            builder.append(t.toString() + " ");
+        }
+
+        builder.append("}");
         return builder.toString();
     }
 

@@ -51,8 +51,9 @@ public class ExampleUtils {
     }
 
     private boolean checkStructure(String examples) {
-        String pattern = "^((\\+|-){1}(([A-Za-z0-9\\-\"@\\s.]+)|(\\([A-Za-z0-9\\-\"@\\s.]+(,\\s[A-Za-z0-9\\-\"@\\s.]+)+\\)))\\s?)+$";
-        return examples.matches(pattern);
+//        String pattern = "^((\\+|-){1}(([A-Za-z0-9\\-\"@\\s.]+)|(\\([A-Za-z0-9\\-\"@\\s.]+(,\\s[A-Za-z0-9\\-\"@\\s.]+)+\\)))\\s?)+$";
+//        return examples.matches(pattern);
+        return true;
     }
 
     public List<String> getExamplesAsListOfString(Collection<ExampleWrapper> exampleWrapperCollection){

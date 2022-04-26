@@ -95,6 +95,16 @@ public class QueryLearner {
         Map<Integer, List<ExampleWrapper>> positiveExamplesByComponent = positiveExampleWrappers.stream().collect(Collectors.groupingBy(ExampleWrapper::getPosition));
         Map<ExampleWrapper, Set<ExampleEntry<String, Triple>>> candidateTriples = deriveCandidateTriples(positiveExamplesByComponent, Optional.empty());
 
+        Set<ExampleWrapper> negativeExampleWrappers;
+        if (null != categorizedExamples.get(ExampleWrapper.CATEGORY_NEGATIVE))
+            negativeExampleWrappers = new HashSet<>(categorizedExamples.get(ExampleWrapper.CATEGORY_NEGATIVE));
+        else
+            negativeExampleWrappers = new HashSet<>();
+        Map<Integer, List<ExampleWrapper>> negativeExamplesByComponent = negativeExampleWrappers.stream().collect(Collectors.groupingBy(ExampleWrapper::getPosition));
+
+        Map<String, List<String>> positiveExampleValues = fillExampleValues(positiveExamplesByComponent);
+        Map<String, List<String>> negativeExampleValues = fillExampleValues(negativeExamplesByComponent);
+
         // Extracting the subjects of the candidate triples
         Set<String> individuals = new HashSet<>();
         if (null == candidateTriples)
@@ -121,16 +131,17 @@ public class QueryLearner {
             for (ExampleWrapper exampleWrapper : candidateTriplesKeySet) {
                 introduceVariables(candidateTriples.get(exampleWrapper), parsedExampleWrappers, triplesBySelectedVariable, exampleWrapper.getPosition());
             }
-            State bestAchievedState = null;
+            State bestAchievedState;
             Set<BasicGraphPattern> bgps = new HashSet<>();
 
             do {
-                constructBasicGraphPattern(candidateTriples, candidateMotifInstances);
+                constructBasicGraphPattern(candidateTriples, candidateMotifInstances, positiveExampleValues, negativeExampleValues);
                 bestAchievedState = states.poll();
 
                 BasicGraphPattern bgp = bestAchievedState.getBasicGraphPattern();
                 bgps.add(bgp);
-                removeCoveredExamplesFromTrainigSet(bgp);
+
+                removeCoveredExamplesFromTrainigSet(bgp, positiveExampleValues, negativeExampleValues);
 
                 if (null != bestAchievedState.getMotifInstance()) {
                     // Printing some values for experimentation purposes.
@@ -154,9 +165,25 @@ public class QueryLearner {
         return Optional.of(derivedQueries);
     }
 
-    private void removeCoveredExamplesFromTrainigSet(BasicGraphPattern bgp) {
+    private Map<String, List<String>> fillExampleValues(Map<Integer, List<ExampleWrapper>> examplesByComponent){
+        Map<String, List<String>> exampleValues = new HashMap<>();
+        for (Map.Entry<Integer, List<ExampleWrapper>> entry : examplesByComponent.entrySet()) {
+            String distinguishedVariable = '?' + Constants.HEAD_VARIABLE_PATTERN + entry.getKey();
+            List<String> values = new LinkedList<>();
+            for (ExampleWrapper ew : entry.getValue()) {
+                values.add(ew.getExample());
+            }
+            exampleValues.put(distinguishedVariable, values);
+        }
+
+        return exampleValues;
+    }
+
+    private void removeCoveredExamplesFromTrainigSet(BasicGraphPattern bgp, Map<String, List<String>> positiveValues, Map<String, List<String>> negativeValues) {
         // Obtaining the bindings of the BGP
-        Map<String, List<String>> bindings = utilsJena.getBindings(bgp);
+        Map<String, List<String>> bindings = utilsJena.getBindingsValues(bgp, positiveValues);
+        if (!negativeValues.isEmpty())
+            bindings.putAll(utilsJena.getBindingsValues(bgp, negativeValues));
 
         Set<String> keys = bindings.keySet();
         keys.removeIf(key -> !key.contains("?" + Constants.HEAD_VARIABLE_PATTERN));
@@ -292,21 +319,21 @@ public class QueryLearner {
         return stringBuilder.toString();
     }
 
-    private void constructBasicGraphPattern(Map<ExampleWrapper, Set<ExampleEntry<String, Triple>>> candidateTriplePatterns, List<Motif> candidateMotifInstances) {
+    private void constructBasicGraphPattern(Map<ExampleWrapper, Set<ExampleEntry<String, Triple>>> candidateTriplePatterns, List<Motif> candidateMotifInstances, Map<String, List<String>> positiveValues, Map<String, List<String>> negativeValues) {
         Map<String, List<Triple>> candidateTriplesByDistinguishedVariable = groupCandidateTriplesByDistinguishedVariable(candidateTriplePatterns);
 
         // Creating a copy of the training set, so we can return to the original one.
         LinkedList<BindingWrapper> temporaryTrainingSet = new LinkedList<>();
         createDeepCopy(trainingSet, temporaryTrainingSet);
 
-        Set<Triple> bestTriplePatterns = selectBestTriplePatterns(candidateTriplesByDistinguishedVariable, temporaryTrainingSet);
+        Set<Triple> bestTriplePatterns = selectBestTriplePatterns(candidateTriplesByDistinguishedVariable, temporaryTrainingSet, positiveValues, negativeValues);
         BasicGraphPattern cbgp = new BasicGraphPattern();
         cbgp.setTriplePatterns(bestTriplePatterns);
 
         temporaryTrainingSet = new LinkedList<>();
         createDeepCopy(trainingSet, temporaryTrainingSet);
-        State state = computeInformation(cbgp, temporaryTrainingSet);
-        computeCoverage(state);
+        State state = computeInformation(cbgp, temporaryTrainingSet, positiveValues, negativeValues);
+        computeCoverage(state, positiveValues);
         states.add(state);
 
         for (Motif motifInstance : candidateMotifInstances) {
@@ -314,7 +341,7 @@ public class QueryLearner {
             LinkedList<BindingWrapper> trainingSetForMotifs = new LinkedList<>();
             createDeepCopy(temporaryTrainingSet, trainingSetForMotifs);
 
-            tryMotifInstance(motifInstance, cbgp, trainingSetForMotifs);
+            tryMotifInstance(motifInstance, cbgp, trainingSetForMotifs, positiveValues, negativeValues);
 
             // If the state contains a motif and it has maximum information and coverage return it.
             if ((!states.peek().equals(state)) && (states.peek().getInformation() == 1) && (states.peek().getCoverage() == 1))
@@ -340,9 +367,9 @@ public class QueryLearner {
         return false;
     }
 
-    private void computeCoverage(State state) {
+    private void computeCoverage(State state, Map<String, List<String>> positiveValues) {
         // Obtaining the bindings of the BGP.
-        Map<String, List<String>> bindings = utilsJena.getBindings(state.getBasicGraphPattern());
+        Map<String, List<String>> bindings = utilsJena.getBindingsValues(state.getBasicGraphPattern(), positiveValues);
 
         // Extracting the bindings of the head variables.
         Set<String> bindingsKeys = bindings.keySet();
@@ -393,7 +420,7 @@ public class QueryLearner {
         }
     }
 
-    private void tryMotifInstance(Motif motifInstance, BasicGraphPattern cbgp, LinkedList<BindingWrapper> temporaryTrainingSet) {
+    private void tryMotifInstance(Motif motifInstance, BasicGraphPattern cbgp, LinkedList<BindingWrapper> temporaryTrainingSet, Map<String, List<String>> positiveValues, Map<String, List<String>> negativeValues) {
         Set<base.domain.Triple> motifTriples = motifInstance.getTriples();
         Set<String> constantsInMotif = new HashSet<>();
         // Replace all the individuals that already have a variable assigned by the variable.
@@ -429,8 +456,8 @@ public class QueryLearner {
                 Set<Triple> bgpTriplePatterns = UtilsJena.convertDomainTriplesToJenaTriples(replaceConstantInTriples(constant, UtilsJena.convertJenaTriplesToDomainTriples(temporaryBgp.getTriplePatterns())));
                 bgpTriplePatterns.addAll(UtilsJena.convertDomainTriplesToJenaTriples(motifInstance.getTriples()));
                 temporaryBgp.setTriplePatterns(bgpTriplePatterns);
-                State state = computeInformation(temporaryBgp, trainingSetForMotif);
-                computeCoverage(state);
+                State state = computeInformation(temporaryBgp, trainingSetForMotif, positiveValues, negativeValues);
+                computeCoverage(state, positiveValues);
                 state.setMotifInstance(motifInstance);
                 states.add(state);
 
@@ -500,7 +527,7 @@ public class QueryLearner {
     }
 
 
-    private Set<Triple> selectBestTriplePatterns(Map<String, List<Triple>> candidateTriplesByDistinguishedVariable, List<BindingWrapper> temporaryTrainingSet) {
+    private Set<Triple> selectBestTriplePatterns(Map<String, List<Triple>> candidateTriplesByDistinguishedVariable, List<BindingWrapper> temporaryTrainingSet, Map<String, List<String>> positiveValues, Map<String, List<String>> negativeValues) {
         Set<Triple> bestTriplePatterns = new HashSet<>();
 
         Set<String> distinguishedVariablesKeySet = candidateTriplesByDistinguishedVariable.keySet();
@@ -512,10 +539,25 @@ public class QueryLearner {
             LinkedList<BindingWrapper> savedTemporaryTrainingSet = new LinkedList<>();
             createDeepCopy(temporaryTrainingSet, savedTemporaryTrainingSet);
 
-            for (Triple triple : triplePatterns) {
+            Map<Node, List<Triple>> triplePatternsByPredicate = triplePatterns.stream()
+                    .collect(Collectors.groupingBy(Triple::getPredicate));
+
+            Set<Node> predicates = triplePatternsByPredicate.keySet();
+            for (Node predicate : predicates) {
+                Triple triple;
+                if (bestTriplePatterns.isEmpty())
+                    triple = triplePatternsByPredicate.get(predicate).get(0);
+                else {
+                    List<Triple> candidateTriplePatterns = triplePatternsByPredicate.get(predicate);
+                    triple = candidateTriplePatterns.stream()
+                            .filter(triple1 -> triple1.getSubject().equals(bestTriplePatterns.iterator().next().getSubject()))
+                            .findFirst()
+                            .orElse(triplePatternsByPredicate.get(predicate).get(0));
+                }
+
                 BasicGraphPattern bgp = new BasicGraphPattern();
                 bgp.setTriplePatterns(Stream.of(triple).collect(Collectors.toCollection(HashSet::new)));
-                State state = computeInformation(bgp, temporaryTrainingSet);
+                State state = computeInformation(bgp, temporaryTrainingSet, positiveValues, negativeValues);
 
                 // If the new triple pattern improves the information, then it's the best one.
                 if (state.getInformation() > bestInformation) {
@@ -537,9 +579,21 @@ public class QueryLearner {
         return bestTriplePatterns;
     }
 
-    private State computeInformation(BasicGraphPattern bgp, List<BindingWrapper> temporaryTrainingSet) {
+    private State computeInformation(BasicGraphPattern bgp, List<BindingWrapper> temporaryTrainingSet, Map<String, List<String>> positiveValues, Map<String, List<String>> negativeValues) {
         // Obtaining the bindings of the BGP
-        Map<String, List<String>> bindings = utilsJena.getBindings(bgp);
+        Map<String, List<String>> bindings = utilsJena.getBindingsValues(bgp, positiveValues);
+        if (!negativeValues.isEmpty()){
+            Map<String, List<String>> negativeBindings = utilsJena.getBindingsValues(bgp, negativeValues);
+            for (Map.Entry<String, List<String>> entry : negativeBindings.entrySet()) {
+                if (bindings.containsKey(entry.getKey())){
+                    List<String> bindingValues = bindings.get(entry.getKey());
+                    bindingValues.addAll(entry.getValue());
+                    bindings.replace(entry.getKey(), bindingValues);
+                } else
+                    bindings.put(entry.getKey(), entry.getValue());
+            }
+        }
+
 
         // removing any duplicates
         Set<BindingWrapper> noDuplicates = new HashSet<>(temporaryTrainingSet);

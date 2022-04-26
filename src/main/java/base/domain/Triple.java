@@ -7,6 +7,10 @@ import java.util.Objects;
 import java.util.Set;
 
 @Entity
+@Table(indexes = {
+        @Index(columnList = "subject"),
+        @Index(columnList = "object")
+})
 public class Triple implements Cloneable{
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
