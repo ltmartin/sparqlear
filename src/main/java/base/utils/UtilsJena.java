@@ -2,22 +2,17 @@ package base.utils;
 
 import base.domain.BasicGraphPattern;
 import org.apache.commons.validator.routines.UrlValidator;
-import org.apache.jena.datatypes.RDFDatatype;
-import org.apache.jena.ext.xerces.util.URI;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
 import org.apache.jena.query.*;
 import org.apache.jena.sparql.core.Var;
 import org.apache.jena.sparql.engine.binding.Binding;
-import org.apache.jena.sparql.util.NodeFactoryExtra;
-import org.apache.jena.sparql.util.Utils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
-import javax.print.attribute.URISyntax;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -52,7 +47,7 @@ public class UtilsJena {
      * @param limit   Specifies a limit of triples to be retrieved according to the role perfomed by the example (subject, predicate or object).
      * @return Set<Triple> containing the derived triples.
      */
-    public Set deriveTriples(String example, Optional<String> dataset, int limit, int offset) throws IOException {
+    public Set<Triple> deriveTriples(String example, Optional<String> dataset, int limit, int offset) throws IOException {
         /*if (!UrlValidator.getInstance().isValid(endpoint))
             throw new IOException("Invalid endpoint");*/
 
@@ -116,17 +111,10 @@ public class UtilsJena {
     }
 
 
-    public boolean runAskQuery(String query) {
-        try (QueryExecution qexec = QueryExecutionFactory.sparqlService(endpoint, query)) {
-            return qexec.execAsk();
-        }
-    }
-
     public Set<List<String>> runQuery(String query) {
         Set<List<String>> results = new HashSet<>();
 
-        try (QueryExecution qexec = QueryExecutionFactory.sparqlService(endpoint, query)) {
-            qexec.setTimeout(timeout, TimeUnit.MINUTES);
+        try (QueryExecution qexec = QueryExecution.service(endpoint).query(query).timeout(timeout, TimeUnit.MINUTES).build()) {
             ResultSet rs = qexec.execSelect();
             while (rs.hasNext()) {
                 QuerySolution row = rs.next();
@@ -163,45 +151,7 @@ public class UtilsJena {
 
     public Set<List<String>> getSubjectBindings(BasicGraphPattern bgp) {
         String query = buildSelectQuery(bgp);
-        Set<List<String>> bindings = runQuery(query);
-
-        return bindings;
-    }
-
-    public Map<String, List<String>> getBindings(BasicGraphPattern bgp){
-        String query = buildSelectQuery(bgp);
-
-        Map<String, List<String>> results = new HashMap<>();
-
-        try (QueryExecution qexec = QueryExecutionFactory.sparqlService(endpoint, query)) {
-            qexec.setTimeout(timeout, TimeUnit.MINUTES);
-            ResultSet rs = qexec.execSelect();
-            while (rs.hasNext()) {
-                Binding binding = rs.nextBinding();
-                Iterator<Var> varIterator = binding.vars();
-                while (varIterator.hasNext()){
-                    Var variable = varIterator.next();
-                    if (!results.containsKey(variable.toString().replace(Constants.PROJECTION_PATTERN, ""))){
-                        String variableBinding = binding.get(variable).toString();
-                        results.put(variable.toString().replace(Constants.PROJECTION_PATTERN, ""), Stream.of(variableBinding).collect(Collectors.toList()));
-                    } else {
-                        List<String> variableBindings = results.get(variable.toString().replace(Constants.PROJECTION_PATTERN, ""));
-                        variableBindings.add(binding.get(variable).toString());
-                        results.replace(variable.toString().replace(Constants.PROJECTION_PATTERN, ""), variableBindings);
-                    }
-                }
-            }
-        } catch (QueryParseException e) {
-            System.out.println("===============================================");
-            logger.log(Level.SEVERE, "Error processing the bindings of the query: \n" + query + "\n");
-            System.out.println("===============================================");
-        } catch (Exception e) {
-            System.out.println("===============================================");
-            logger.log(Level.SEVERE, "It has occurred an external error processing the bindings of the query: \n" + query + "\n");
-            System.out.println("===============================================");
-        }
-
-        return results;
+        return runQuery(query);
     }
 
     public Map<String, List<String>> getBindingsValues(BasicGraphPattern bgp, Map<String, List<String>> values){
@@ -299,14 +249,14 @@ public class UtilsJena {
 
         builder.append(" VALUES (");
 
-        List<Tuple> tuples = new LinkedList<>();
+        List<Tuple<String>> tuples = new LinkedList<>();
 
         for (Map.Entry<String, List<String>> entry : values.entrySet())
             if (variables.contains(entry.getKey())) {
                 builder.append(entry.getKey() + " ");
                 List<String> elements = entry.getValue();
                 if (tuples.isEmpty())
-                    elements.forEach( e -> tuples.add(new Tuple(e)));
+                    elements.forEach( e -> tuples.add(new Tuple<>(e)));
                 else {
                     int entryIndex = 0;
                     for (String e : elements) {
@@ -351,7 +301,7 @@ public class UtilsJena {
     public static Set<Triple> convertDomainTriplesToJenaTriples(Set<base.domain.Triple> domainTriples){
         Set<Triple> triples = new HashSet<>();
         for (base.domain.Triple domainTriple : domainTriples) {
-            Node subject = null, object = null;
+            Node subject, object;
             if (UtilsJena.isVariable(domainTriple.getSubject())){
                 subject = NodeFactory.createVariable(domainTriple.getSubject().substring(1));
             } else
