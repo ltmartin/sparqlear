@@ -12,7 +12,7 @@ import java.util.*;
 public class ExampleUtils {
 
     public Set<ExampleWrapper> parseExamples(String examples) throws ParseException {
-        Set<ExampleWrapper> parsedExampleWrappers = new HashSet<>();
+        Set<ExampleWrapper> parsedExampleWrappers = new LinkedHashSet<>();
         if (checkStructure(examples)){
             boolean groupedExamples = examples.contains("(");
             Set<String> splittedStringExamples = new LinkedHashSet<>();

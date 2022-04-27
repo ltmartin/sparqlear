@@ -97,9 +97,9 @@ public class QueryLearner {
 
         Set<ExampleWrapper> negativeExampleWrappers;
         if (null != categorizedExamples.get(ExampleWrapper.CATEGORY_NEGATIVE))
-            negativeExampleWrappers = new HashSet<>(categorizedExamples.get(ExampleWrapper.CATEGORY_NEGATIVE));
+            negativeExampleWrappers = new LinkedHashSet<>(categorizedExamples.get(ExampleWrapper.CATEGORY_NEGATIVE));
         else
-            negativeExampleWrappers = new HashSet<>();
+            negativeExampleWrappers = new LinkedHashSet<>();
         Map<Integer, List<ExampleWrapper>> negativeExamplesByComponent = negativeExampleWrappers.stream().collect(Collectors.groupingBy(ExampleWrapper::getPosition));
 
         Map<String, List<String>> positiveExampleValues = fillExampleValues(positiveExamplesByComponent);
