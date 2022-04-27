@@ -1,29 +1,29 @@
 version: "3.3"
 
 services:
-  sparqlear:
-    depends_on:
-      - virtuoso
-      - postgres
-    links:
-        - virtuoso
-        - postgres
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: ltmartin/sparqlear:latest
-    container_name: sparqlear
-    restart: on-failure
-    tty: true
-    stdin_open: true
-    volumes:
-    - ./data:/sparqlear/data
+#  sparqlear:
+#    depends_on:
+#      - virtuoso
+#      - postgres
+#    links:
+#        - virtuoso
+#        - postgres
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    image: ltmartin/sparqlear:latest
+#    container_name: sparqlear
+#    restart: on-failure
+#    tty: true
+#    stdin_open: true
+#    volumes:
+#    - ./data:/sparqlear/data
 
   virtuoso:
     image: openlink/virtuoso-opensource-7:latest
     restart: always
     volumes:
-    - virtuoso-database:/database
+    - virtuoso_smallimdb:/database
     ports:
     - "8890:8890"
 
@@ -36,9 +36,9 @@ services:
       POSTGRES_PASSWORD: example
       POSTGRES_USER: converter
     volumes:
-      - postgres-database:/var/lib/postgresql/data
+      - postgres_smallimdb:/var/lib/postgresql/data
 volumes:
-  postgres-database:
+  postgres_smallimdb:
     external: true
-  virtuoso-database:
+  virtuoso_smallimdb:
     external: true

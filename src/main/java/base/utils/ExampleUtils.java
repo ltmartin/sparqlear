@@ -80,7 +80,7 @@ public class ExampleUtils {
     public static String cleanString(String _string){
         _string = UtilsJena.removeLanguageAnnotation(_string);
         _string = _string.replaceAll("\"", "");
-
+        _string = _string.replaceAll("\\\\", "");
         return _string;
     }
 

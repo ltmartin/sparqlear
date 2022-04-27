@@ -117,10 +117,11 @@ public class QueryLearner {
         }
 
         // Finding the candidate motif instances involving individuals from the candidate triples
-        List<Motif> candidateMotifInstances = new LinkedList<>();
-        for (String ind : individuals) {
-            candidateMotifInstances.addAll(motifsService.findMotifsInvolvingIndividual(ind));
-        }
+        List<Motif> candidateMotifInstances = Collections.synchronizedList(new LinkedList<>());
+        individuals.parallelStream()
+                .forEach(ind -> {
+                    candidateMotifInstances.addAll(motifsService.findMotifsInvolvingIndividual(ind));
+                });
 
         // Sorting all the motif instances to avoid randomness
         candidateMotifInstances.sort(Comparator.comparing(Motif::getId));
@@ -131,12 +132,21 @@ public class QueryLearner {
             for (ExampleWrapper exampleWrapper : candidateTriplesKeySet) {
                 introduceVariables(candidateTriples.get(exampleWrapper), parsedExampleWrappers, triplesBySelectedVariable, exampleWrapper.getPosition());
             }
-            State bestAchievedState;
+            State bestAchievedState = null;
             Set<BasicGraphPattern> bgps = new HashSet<>();
 
             do {
                 constructBasicGraphPattern(candidateTriples, candidateMotifInstances, positiveExampleValues, negativeExampleValues);
-                bestAchievedState = states.poll();
+
+                // this piece of code promotes the best query containing a motif
+                for (State s : states) {
+                    if ((null != s.getMotifInstance()) && (s.getInformation() == 1) && (s.getCoverage() == 1)) {
+                        bestAchievedState = s;
+                        break;
+                    }
+                }
+                if (null == bestAchievedState)
+                    bestAchievedState = states.poll();
 
                 BasicGraphPattern bgp = bestAchievedState.getBasicGraphPattern();
                 bgps.add(bgp);
@@ -336,6 +346,10 @@ public class QueryLearner {
         computeCoverage(state, positiveValues);
         states.add(state);
 
+        // if we don't want to enforce that the query contains a motif, the following line could be used to increase the performance
+//        if ((states.peek().getInformation() == 1) && (states.peek().getCoverage() == 1))
+//            return;
+
         for (Motif motifInstance : candidateMotifInstances) {
             // We save the training set created when the best triple patterns were chosen, and continue from there.
             LinkedList<BindingWrapper> trainingSetForMotifs = new LinkedList<>();
@@ -343,9 +357,13 @@ public class QueryLearner {
 
             tryMotifInstance(motifInstance, cbgp, trainingSetForMotifs, positiveValues, negativeValues);
 
-            // If the state contains a motif and it has maximum information and coverage return it.
-            if ((!states.peek().equals(state)) && (states.peek().getInformation() == 1) && (states.peek().getCoverage() == 1))
-                break;
+
+            for (State s : states) {
+                // If there is a state that contains a motif and it has maximum information and coverage return it.
+                if ((null != s.getMotifInstance()) && (s.getInformation() == 1) && (s.getCoverage() == 1))
+                    return;
+            }
+
 
             if (!enoughImprovement())
                 break;
@@ -377,9 +395,7 @@ public class QueryLearner {
         for (String key : bindingsKeys) {
             if (key.contains(Constants.HEAD_VARIABLE_PATTERN)) {
                 List<String> values = bindings.get(key);
-                for (String value : values) {
-                    bindingValues.add(UtilsJena.getCanonicalString(value));
-                }
+                bindingValues.addAll(values);
             }
         }
 
@@ -398,6 +414,9 @@ public class QueryLearner {
         for (int i = 0; i < valuesInPositiveTuplesList.size(); i++) {
             String _value = valuesInPositiveTuplesList.get(0);
             valuesInPositiveTuplesList.remove(0);
+            // this line is a horrible patch required do to escape characters in the data
+            _value = _value.replaceAll("\\\\", "");
+
             valuesInPositiveTuplesList.add(ExampleUtils.cleanString(_value));
         }
         Set<String> valuesInPositiveTuples = new HashSet<>();
@@ -674,7 +693,7 @@ public class QueryLearner {
             allCandidateTriples.addAll(entry.getValue());
         }
 
-        List<ExampleEntry<String, Triple>> candidateTriplesWithDistinguishedVariables = allCandidateTriples.stream()
+        List<ExampleEntry<String, Triple>> candidateTriplesWithDistinguishedVariables = allCandidateTriples.parallelStream()
                 .filter(t -> t.getValue().getObject().toString().contains(Constants.HEAD_VARIABLE_PATTERN))
                 .collect(Collectors.toList());
 

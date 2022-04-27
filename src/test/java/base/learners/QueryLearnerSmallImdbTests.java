@@ -51,8 +51,8 @@ public class QueryLearnerSmallImdbTests {
     }
 
     @Test
-    void moviesInEnglish() {
-        String examples = "+(Reality Quest, English) +(.com for Murder, English) +(1971, English)";
+    void moviesFromUSA() {
+        String examples = "+(USA, Gettin\\' Through Life with Mickey Rourke) +(USA, Cadets on Parade) -(1024 FILM, Characters)";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");
