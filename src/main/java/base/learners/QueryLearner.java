@@ -697,19 +697,10 @@ public class QueryLearner {
                 .filter(t -> t.getValue().getObject().toString().contains(Constants.HEAD_VARIABLE_PATTERN))
                 .collect(Collectors.toList());
 
-        Map<String, List<Triple>> candidateTriplesByDistinguishedVariable = new HashMap<>();
-        for (ExampleEntry<String, Triple> entry : candidateTriplesWithDistinguishedVariables) {
-            Triple triple = entry.getValue();
+        Map<String, List<Triple>> candidateTriplesByDistinguishedVariable = candidateTriplesWithDistinguishedVariables.stream()
+                .map(entry -> entry.getValue())
+                .collect(Collectors.groupingBy(triple -> triple.getObject().toString()));
 
-            String key = triple.getObject().toString();
-            if (candidateTriplesByDistinguishedVariable.containsKey(key)) {
-                List<Triple> triples = new LinkedList<>(candidateTriplesByDistinguishedVariable.get(key));
-                triples.add(triple);
-                candidateTriplesByDistinguishedVariable.replace(key, triples);
-            } else {
-                candidateTriplesByDistinguishedVariable.put(key, List.of(triple));
-            }
-        }
         return candidateTriplesByDistinguishedVariable;
     }
 
