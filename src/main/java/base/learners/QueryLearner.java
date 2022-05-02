@@ -117,11 +117,7 @@ public class QueryLearner {
         }
 
         // Finding the candidate motif instances involving individuals from the candidate triples
-        List<Motif> candidateMotifInstances = Collections.synchronizedList(new LinkedList<>());
-        individuals.parallelStream()
-                .forEach(ind -> {
-                    candidateMotifInstances.addAll(motifsService.findMotifsInvolvingIndividual(ind));
-                });
+        List<Motif> candidateMotifInstances = motifsService.loadAllMotifs();
 
         // Sorting all the motif instances to avoid randomness
         candidateMotifInstances.sort(Comparator.comparing(Motif::getId));

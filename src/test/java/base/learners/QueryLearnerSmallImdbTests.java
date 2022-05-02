@@ -66,4 +66,39 @@ public class QueryLearnerSmallImdbTests {
             e.printStackTrace();
         }
     }
+
+    @Test
+    void moviesFromUSA2() {
+        String examples = "+(USA, 2 Minutes Later) +(USA, 101 Dalmatians) -(1024 FILM, Characters)";
+        try {
+            Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
+            System.out.println("===================================================");
+            System.out.println("Result: ");
+            if (!learnedQueries.isPresent())
+                System.out.println("Nothing learned.");
+            else
+                learnedQueries.stream().forEach(System.out::println);
+            System.out.println("===================================================");
+        } catch (ParseException | IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    @Test
+    void moviesFromIsleOfMan() {
+        String examples = "+(Isle of Man, Miss Potter) +(Isle of Man, The Mistress of Spices) -(Rwanda, Rising from Ashes) -(Mali, Macadam tribu)";
+        try {
+            Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
+            System.out.println("===================================================");
+            System.out.println("Result: ");
+            if (!learnedQueries.isPresent())
+                System.out.println("Nothing learned.");
+            else
+                learnedQueries.stream().forEach(System.out::println);
+            System.out.println("===================================================");
+        } catch (ParseException | IOException e) {
+            e.printStackTrace();
+        }
+    }
 }
