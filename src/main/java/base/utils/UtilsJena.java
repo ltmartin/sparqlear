@@ -114,7 +114,7 @@ public class UtilsJena {
     public Set<List<String>> runQuery(String query) {
         Set<List<String>> results = new HashSet<>();
 
-        try (QueryExecution qexec = QueryExecution.service(endpoint).query(query).timeout(timeout, TimeUnit.MINUTES).build()) {
+        try (QueryExecution qexec = QueryExecution.service(endpoint).query(query).timeout(timeout, TimeUnit.SECONDS).build()) {
             ResultSet rs = qexec.execSelect();
             while (rs.hasNext()) {
                 QuerySolution row = rs.next();
@@ -133,7 +133,7 @@ public class UtilsJena {
             System.out.println("===============================================");
         } catch (Exception e) {
             System.out.println("===============================================");
-            logger.log(Level.SEVERE, "It has occurred an external error processing the query: \n" + query + "\n");
+            logger.log(Level.INFO, "Query timed out: \n" + query + "\n");
             System.out.println("===============================================");
         }
 
@@ -159,7 +159,7 @@ public class UtilsJena {
 
         Map<String, List<String>> results = new HashMap<>();
 
-        try (QueryExecution qexec = QueryExecution.service(endpoint).query(query).timeout(timeout, TimeUnit.MINUTES).build()) {
+        try (QueryExecution qexec = QueryExecution.service(endpoint).query(query).timeout(timeout, TimeUnit.SECONDS).build()) {
             ResultSet rs = qexec.execSelect();
             while (rs.hasNext()) {
                 Binding binding = rs.nextBinding();
@@ -185,7 +185,7 @@ public class UtilsJena {
             throw e;
         } catch (Exception e) {
             System.out.println("===============================================");
-            logger.log(Level.SEVERE, "It has occurred an external error processing the bindings of the query: \n" + query + "\n");
+            logger.log(Level.INFO, "Query timed out: \n" + query + "\n");
             System.out.println("===============================================");
         }
 
