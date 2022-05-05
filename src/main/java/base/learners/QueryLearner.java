@@ -16,6 +16,8 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.text.ParseException;
 import java.util.*;
 import java.util.logging.Level;
@@ -54,21 +56,10 @@ public class QueryLearner {
 
 
     public QueryLearner() {
-        // this priority queue will prioritize the states where the sum of information and coverage is bigger.
-        this.states = new PriorityQueue<>((state1, state2) -> {
-            if (((state1.getInformation() != 0) || (state1.getCoverage() != 0)) && ((state2.getInformation() != 0) || (state2.getCoverage() != 0))){
-                double f1_state1 = computeF1(state1);
-                double f1_state2 = computeF1(state2);
-                return Double.compare(f1_state1, f1_state2) * -1;
-            }
-
-            return 0;
-        });
+        this.states = new PriorityQueue<>();
     }
 
-    private double computeF1(State state) {
-        return 2 * ((state.getInformation() * state.getCoverage()) / (state.getInformation() + state.getCoverage()));
-    }
+
 
     public Optional<Set<String>> learn(String examples) throws ParseException, IOException {
         Set<String> derivedQueries = new HashSet<>();
@@ -453,10 +444,10 @@ public class QueryLearner {
         }
 
         // verify that the motif contains variables present on the cbgp.
-        Set<String> variablesInMotif = getVariablesInMotif(motifTriples);
+        //Set<String> variablesInMotif = getVariablesInMotif(motifTriples);
         Set<String> variablesInCbgp = getVariablesInCbgp(cbgp);
-        if (Sets.intersection(variablesInCbgp, variablesInMotif).isEmpty())
-            return;
+//        if (Sets.intersection(variablesInCbgp, variablesInMotif).isEmpty())
+//            return;
 
         for (int i = 0; i < constantsInMotif.size(); i++) {
             BasicGraphPattern temporaryBgp = states.peek().getBasicGraphPattern().clone();
@@ -467,8 +458,8 @@ public class QueryLearner {
                 List<BindingWrapper> trainingSetForMotif = new LinkedList<>();
                 createDeepCopy(temporaryTrainingSet, trainingSetForMotif);
 
-                motifInstance.setTriples(replaceConstantInTriples(constant, motifInstance.getTriples()));
-                Set<Triple> bgpTriplePatterns = UtilsJena.convertDomainTriplesToJenaTriples(replaceConstantInTriples(constant, UtilsJena.convertJenaTriplesToDomainTriples(temporaryBgp.getTriplePatterns())));
+                motifInstance.setTriples(replaceConstantInTriples(constant, motifInstance.getTriples(), variablesInCbgp));
+                Set<Triple> bgpTriplePatterns = UtilsJena.convertDomainTriplesToJenaTriples(replaceConstantInTriples(constant, UtilsJena.convertJenaTriplesToDomainTriples(temporaryBgp.getTriplePatterns()), variablesInCbgp));
                 bgpTriplePatterns.addAll(UtilsJena.convertDomainTriplesToJenaTriples(motifInstance.getTriples()));
                 temporaryBgp.setTriplePatterns(bgpTriplePatterns);
                 State state = computeInformation(temporaryBgp, trainingSetForMotif, positiveValues, negativeValues);
@@ -487,31 +478,80 @@ public class QueryLearner {
 
             // The best state might not contain a motif. In order to explore further the motif instance
             // we choose the best motif instance we can find, and try to generate a better state using it.
-            for (State s : states) {
+            PriorityQueue<State> backup = new PriorityQueue<>();
+            while (!states.isEmpty()){
+                State s = states.poll();
+                backup.add(s);
                 if (null != s.getMotifInstance()) {
                     motifInstance = s.getMotifInstance();
                     break;
                 }
             }
+            states.addAll(backup);
         }
     }
 
-    private Set<base.domain.Triple> replaceConstantInTriples(String constant, Set<base.domain.Triple> triples) {
-        if (!variableNames.containsKey(constant)) {
-            variableNames.put(constant, NodeFactory.createVariable(Constants.EXISTENTIAL_VARIABLE_PATTERN + nsvIndex++));
-        }
-        Set<base.domain.Triple> newTriplePatterns = new HashSet<>();
+    private Set<base.domain.Triple> replaceConstantInTriples(String constant, Set<base.domain.Triple> triples, Set<String> variablesInCandidateTriples) {
+        String sameTypeConstant = findSameTypeConstant(constant, variablesInCandidateTriples);
 
+        Set<base.domain.Triple> newTriplePatterns = new HashSet<>();
+        if (null == sameTypeConstant) {
+            if (!variableNames.containsKey(constant)) {
+                variableNames.put(constant, NodeFactory.createVariable(Constants.EXISTENTIAL_VARIABLE_PATTERN + nsvIndex++));
+            }
+            doReplacement(constant, triples, constant, newTriplePatterns);
+        } else {
+            doReplacement(constant, triples, sameTypeConstant, newTriplePatterns);
+        }
+        return newTriplePatterns;
+    }
+
+    private String findSameTypeConstant(String constant, Set<String> variablesInCandidateTriples) {
+        try {
+            // Validate if the constant is a valid URI
+            new URL(constant);
+
+            String constantType = findElementType(constant);
+            if (null == constantType)
+                return null;
+            for (Map.Entry<String, Node> variableName : variableNames.entrySet()) {
+                if (variablesInCandidateTriples.contains(variableName.getValue().toString())) {
+                    try {
+                        // Validate if the element is a valid URI
+                        new URL(variableName.getKey());
+
+                        String variableType = findElementType(variableName.getKey());
+                        if (null == variableType)
+                            return null;
+                        if (constantType.equals(variableType))
+                            return variableName.getKey();
+                    } catch (MalformedURLException e) {
+                    }
+                }
+            }
+        } catch (MalformedURLException e){}
+
+        return null;
+    }
+
+    private String findElementType(String element){
+        final String query = "SELECT ?type where { <" + element + "> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?type . }";
+        Set<List<String>> results = utilsJena.runQuery(query);
+        if (results.iterator().hasNext())
+            return results.iterator().next().get(0);
+        return null;
+    }
+
+    private void doReplacement(String constant, Set<base.domain.Triple> triples, String replacement, Set<base.domain.Triple> newTriplePatterns) {
         for (base.domain.Triple triple : triples) {
             String tripleSubject = UtilsJena.getCanonicalString(triple.getSubject());
             if (tripleSubject.equals(constant))
-                triple.setSubject(variableNames.get(constant).toString());
+                triple.setSubject(variableNames.get(replacement).toString());
             String tripleObject = UtilsJena.getCanonicalString(triple.getObject());
             if (tripleObject.equals(constant))
-                triple.setObject(variableNames.get(constant).toString());
+                triple.setObject(variableNames.get(replacement).toString());
             newTriplePatterns.add(triple);
         }
-        return newTriplePatterns;
     }
 
 

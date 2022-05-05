@@ -132,9 +132,9 @@ public class UtilsJena {
             logger.log(Level.SEVERE, "Error processing the query: \n" + query + "\n");
             System.out.println("===============================================");
         } catch (Exception e) {
-            System.out.println("===============================================");
+            logger.log(Level.INFO,"===============================================");
             logger.log(Level.INFO, "Query timed out: \n" + query + "\n");
-            System.out.println("===============================================");
+            logger.log(Level.INFO,"===============================================");
         }
 
         return results;
@@ -184,9 +184,9 @@ public class UtilsJena {
             System.out.println("===============================================");
             throw e;
         } catch (Exception e) {
-            System.out.println("===============================================");
+            logger.log(Level.INFO,"===============================================");
             logger.log(Level.INFO, "Query timed out: \n" + query + "\n");
-            System.out.println("===============================================");
+            logger.log(Level.INFO,"===============================================");
         }
 
         return results;

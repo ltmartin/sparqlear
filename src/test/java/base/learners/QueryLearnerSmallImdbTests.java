@@ -52,23 +52,6 @@ public class QueryLearnerSmallImdbTests {
 
     @Test
     void moviesFromUSA() {
-        String examples = "+(USA, Gettin\\' Through Life with Mickey Rourke) +(USA, Cadets on Parade) -(1024 FILM, Characters)";
-        try {
-            Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
-            System.out.println("===================================================");
-            System.out.println("Result: ");
-            if (!learnedQueries.isPresent())
-                System.out.println("Nothing learned.");
-            else
-                learnedQueries.stream().forEach(System.out::println);
-            System.out.println("===================================================");
-        } catch (ParseException | IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    @Test
-    void moviesFromUSA2() {
         String examples = "+(USA, 2 Minutes Later) +(USA, 101 Dalmatians) -(1024 FILM, Characters)";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
@@ -87,7 +70,24 @@ public class QueryLearnerSmallImdbTests {
 
     @Test
     void moviesFromIsleOfMan() {
-        String examples = "+(Isle of Man, Miss Potter) +(Isle of Man, The Mistress of Spices) -(Rwanda, Rising from Ashes) -(Mali, Macadam tribu)";
+        String examples = "+(Isle of Man, Miss Potter) +(Isle of Man, The Mistress of Spices) -(USA, 101 Dalmatians) -(UK, Red Sky) -(Ireland, Miss Julie) -(Rwanda, Rising from Ashes) -(Mali, Macadam tribu)";
+        try {
+            Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
+            System.out.println("===================================================");
+            System.out.println("Result: ");
+            if (!learnedQueries.isPresent())
+                System.out.println("Nothing learned.");
+            else
+                learnedQueries.stream().forEach(System.out::println);
+            System.out.println("===================================================");
+        } catch (ParseException | IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Test
+    void moviesFromItaly() {
+        String examples = "+(Italy, 1000 dollari sul nero) +(Italy, A casa nostra) -(UK, Red Sky) -(Ireland, Miss Julie) -(Rwanda, Rising from Ashes) -(Mali, Macadam tribu)";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");

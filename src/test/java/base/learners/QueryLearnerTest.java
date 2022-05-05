@@ -18,7 +18,7 @@ class QueryLearnerTest {
 
     @Test
     void allPositiveSingleVariableExamples() {
-        String examples = "+\"Rafi Muhammad Chaudhry\"@en +\"Sergey Psakhie\"@en +\"Igniacio Matte Blanco\"@en";
+        String examples = "+Rafi Muhammad Chaudhry +Sergey Psakhie +Igniacio Matte Blanco";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");
@@ -35,7 +35,7 @@ class QueryLearnerTest {
 
     @Test
     void positiveAndNegativeSingleVariableExamples() {
-        String examples = "+\"Rafi Muhammad Chaudhry\"@en +\"Sergey Psakhie\"@en +\"Igniacio Matte Blanco\"@en -Italian";
+        String examples = "+Rafi Muhammad Chaudhry +Sergey Psakhie +Igniacio Matte Blanco -Italian";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");
