@@ -107,11 +107,10 @@ public class QueryLearner {
             }
         }
 
-        // Finding the candidate motif instances involving individuals from the candidate triples
-        List<Motif> candidateMotifInstances = motifsService.loadAllMotifs();
+        List<Motif> allMotifsInstances = motifsService.loadAllMotifs();
 
         // Sorting all the motif instances to avoid randomness
-        candidateMotifInstances.sort(Comparator.comparing(Motif::getId));
+        allMotifsInstances.sort(Comparator.comparing(Motif::getId));
 
         if (null == parsedDatasets) {
             // Creating the candidate triple patterns
@@ -123,7 +122,7 @@ public class QueryLearner {
             Set<BasicGraphPattern> bgps = new HashSet<>();
 
             do {
-                constructBasicGraphPattern(candidateTriples, candidateMotifInstances, positiveExampleValues, negativeExampleValues);
+                constructBasicGraphPattern(candidateTriples, allMotifsInstances, positiveExampleValues, negativeExampleValues);
 
                 // this piece of code promotes the best query containing a motif
                 for (State s : states) {
