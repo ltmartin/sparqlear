@@ -48,3 +48,7 @@ volumes:
 #    external: true
 #  virtuoso-database:
 #    external: true
+#  postgres_peopleDataset:
+#    external: true
+#  virtuoso_peopleDataset:
+#    external: true
