@@ -8,6 +8,7 @@ import org.apache.commons.lang3.SerializationUtils;
 import org.apache.jena.graph.Node;
 import org.apache.jena.graph.NodeFactory;
 import org.apache.jena.graph.Triple;
+import org.apache.jena.sparql.util.NodeFactoryExtra;
 import org.springframework.beans.factory.annotation.Lookup;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
@@ -54,11 +55,12 @@ public class QueryLearner {
     private Map<Boolean, List<ExampleWrapper>> categorizedExamples;
     private PriorityQueue<State> states;
 
+    private Queue<String> variablesInCbgpQueue;
+
 
     public QueryLearner() {
         this.states = new PriorityQueue<>();
     }
-
 
 
     public Optional<Set<String>> learn(String examples) throws ParseException, IOException {
@@ -135,6 +137,9 @@ public class QueryLearner {
                     bestAchievedState = states.poll();
 
                 BasicGraphPattern bgp = bestAchievedState.getBasicGraphPattern();
+                if (null != bestAchievedState.getMotifInstance())
+                    bgp.getTriplePatterns().addAll(UtilsJena.convertDomainTriplesToJenaTriples(bestAchievedState.getMotifInstance().getTriples()));
+
                 bgps.add(bgp);
 
                 removeCoveredExamplesFromTrainigSet(bgp, positiveExampleValues, negativeExampleValues);
@@ -161,7 +166,7 @@ public class QueryLearner {
         return Optional.of(derivedQueries);
     }
 
-    private Map<String, List<String>> fillExampleValues(Map<Integer, List<ExampleWrapper>> examplesByComponent){
+    private Map<String, List<String>> fillExampleValues(Map<Integer, List<ExampleWrapper>> examplesByComponent) {
         Map<String, List<String>> exampleValues = new HashMap<>();
         for (Map.Entry<Integer, List<ExampleWrapper>> entry : examplesByComponent.entrySet()) {
             String distinguishedVariable = '?' + Constants.HEAD_VARIABLE_PATTERN + entry.getKey();
@@ -328,7 +333,7 @@ public class QueryLearner {
 
         temporaryTrainingSet = new LinkedList<>();
         createDeepCopy(trainingSet, temporaryTrainingSet);
-        State state = computeInformation(cbgp, temporaryTrainingSet, positiveValues, negativeValues);
+        State state = computeInformation(cbgp, null, temporaryTrainingSet, positiveValues, negativeValues);
         computeCoverage(state, positiveValues);
         states.add(state);
 
@@ -336,12 +341,14 @@ public class QueryLearner {
 //        if ((states.peek().getInformation() == 1) && (states.peek().getCoverage() == 1))
 //            return;
 
-        for (Motif motifInstance : candidateMotifInstances) {
+        for (int i = 0; i < candidateMotifInstances.size(); i++) {
+            Motif motifInstance = candidateMotifInstances.get(i);
             // We save the training set created when the best triple patterns were chosen, and continue from there.
             LinkedList<BindingWrapper> trainingSetForMotifs = new LinkedList<>();
             createDeepCopy(temporaryTrainingSet, trainingSetForMotifs);
+            Map<String, Node> variableNamesCopy = new HashMap<>(variableNames);
 
-            tryMotifInstance(motifInstance, cbgp, trainingSetForMotifs, positiveValues, negativeValues);
+            tryMotifInstance(motifInstance, cbgp, trainingSetForMotifs, positiveValues, negativeValues, variableNamesCopy);
 
 
             for (State s : states) {
@@ -351,7 +358,7 @@ public class QueryLearner {
             }
 
 
-            if (!enoughImprovement())
+            if ((i > 5) && (!enoughImprovement()))
                 break;
         }
     }
@@ -361,10 +368,10 @@ public class QueryLearner {
         if (stateList.size() < 11)
             return true;
 
-        for (int i = 0; i < 10; i++){
+        for (int i = 0; i < 10; i++) {
 
-            double information = Math.abs(stateList.get(i).getInformation() - stateList.get(i+1).getInformation())/Double.max(stateList.get(i).getInformation(), stateList.get(i+1).getInformation());
-            double coverage =  Math.abs(stateList.get(i).getCoverage() - stateList.get(i+1).getCoverage())/Double.max(stateList.get(i+1).getCoverage(), stateList.get(i+1).getCoverage());
+            double information = Math.abs(stateList.get(i).getInformation() - stateList.get(i + 1).getInformation()) / Double.max(stateList.get(i).getInformation(), stateList.get(i + 1).getInformation());
+            double coverage = Math.abs(stateList.get(i).getCoverage() - stateList.get(i + 1).getCoverage()) / Double.max(stateList.get(i + 1).getCoverage(), stateList.get(i + 1).getCoverage());
             if (Double.max(information, coverage) >= improvementThreshold)
                 return true;
         }
@@ -372,8 +379,14 @@ public class QueryLearner {
     }
 
     private void computeCoverage(State state, Map<String, List<String>> positiveValues) {
+        BasicGraphPattern temporalBgp = new BasicGraphPattern();
+        temporalBgp.getTriplePatterns().addAll(state.getBasicGraphPattern().getTriplePatterns());
+
+        if (null != state.getMotifInstance())
+            temporalBgp.getTriplePatterns().addAll(UtilsJena.convertDomainTriplesToJenaTriples(state.getMotifInstance().getTriples()));
+
         // Obtaining the bindings of the BGP.
-        Map<String, List<String>> bindings = utilsJena.getBindingsValues(state.getBasicGraphPattern(), positiveValues);
+        Map<String, List<String>> bindings = utilsJena.getBindingsValues(temporalBgp, positiveValues);
 
         // Extracting the bindings of the head variables.
         Set<String> bindingsKeys = bindings.keySet();
@@ -425,7 +438,7 @@ public class QueryLearner {
         }
     }
 
-    private void tryMotifInstance(Motif motifInstance, BasicGraphPattern cbgp, LinkedList<BindingWrapper> temporaryTrainingSet, Map<String, List<String>> positiveValues, Map<String, List<String>> negativeValues) {
+    private void tryMotifInstance(Motif motifInstance, BasicGraphPattern cbgp, LinkedList<BindingWrapper> temporaryTrainingSet, Map<String, List<String>> positiveValues, Map<String, List<String>> negativeValues, Map<String, Node> variableNamesCopy) {
         Set<base.domain.Triple> motifTriples = motifInstance.getTriples();
         Set<String> constantsInMotif = new HashSet<>();
         // Replace all the individuals that already have a variable assigned by the variable.
@@ -434,8 +447,8 @@ public class QueryLearner {
             // This line is to take advantage of the loop and store the constant in a collection for later use.
             constantsInMotif.add(subject);
 
-            if (variableNames.containsKey(subject))
-                triple.setSubject(variableNames.get(subject).toString());
+            if (variableNamesCopy.containsKey(subject))
+                triple.setSubject(variableNamesCopy.get(subject).toString());
 
             // The two lines are to take advantage of the loop and store the constants in a collection for later use.
             String object = UtilsJena.getCanonicalString(triple.getObject());
@@ -448,22 +461,49 @@ public class QueryLearner {
 //        if (Sets.intersection(variablesInCbgp, variablesInMotif).isEmpty())
 //            return;
 
+        List<BindingWrapper> trainingSetForMotif;
         for (int i = 0; i < constantsInMotif.size(); i++) {
             BasicGraphPattern temporaryBgp = states.peek().getBasicGraphPattern().clone();
             for (String constant : constantsInMotif) {
+                variablesInCbgpQueue = new LinkedList<>(variablesInCbgp);
+                while (!variablesInCbgpQueue.isEmpty()) {
+                    // Keeping a copy of the motif instance for the case I need to restore it.
+                    Motif savedMotifInstance = motifInstance.clone();
+                    BasicGraphPattern savedBgp = temporaryBgp.clone();
+
+                    trainingSetForMotif = new LinkedList<>();
+                    createDeepCopy(temporaryTrainingSet, trainingSetForMotif);
+                    motifInstance.setTriples(replaceConstantInMotifTriples(constant, motifInstance.getTriples(), variableNamesCopy));
+                    Set<Triple> bgpTriplePatterns = UtilsJena.convertDomainTriplesToJenaTriples(replaceConstantInTriples(constant, UtilsJena.convertJenaTriplesToDomainTriples(temporaryBgp.getTriplePatterns()), variablesInCbgp, variableNamesCopy));
+                    temporaryBgp.setTriplePatterns(bgpTriplePatterns);
+                    State state = computeInformation(temporaryBgp, motifInstance, trainingSetForMotif, positiveValues, negativeValues);
+                    state.setMotifInstance(motifInstance);
+                    computeCoverage(state, positiveValues);
+                    states.add(state);
+
+                    if ((state.getCoverage() == 1) && (state.getInformation() == 1))
+                        return;
+
+                    // restore the motif instance
+                    motifInstance = savedMotifInstance.clone();
+                    // restore the temporaryBgp
+                    temporaryBgp = savedBgp.clone();
+                }
+                // This is an ugly hack to first introduce variables already existing in the candidate triples and later other replacements.
                 // Keeping a copy of the motif instance for the case I need to restore it.
                 Motif savedMotifInstance = motifInstance.clone();
                 BasicGraphPattern savedBgp = temporaryBgp.clone();
-                List<BindingWrapper> trainingSetForMotif = new LinkedList<>();
-                createDeepCopy(temporaryTrainingSet, trainingSetForMotif);
 
-                motifInstance.setTriples(replaceConstantInTriples(constant, motifInstance.getTriples(), variablesInCbgp));
-                Set<Triple> bgpTriplePatterns = UtilsJena.convertDomainTriplesToJenaTriples(replaceConstantInTriples(constant, UtilsJena.convertJenaTriplesToDomainTriples(temporaryBgp.getTriplePatterns()), variablesInCbgp));
-                bgpTriplePatterns.addAll(UtilsJena.convertDomainTriplesToJenaTriples(motifInstance.getTriples()));
+                variableNamesCopy = new HashMap<>(variableNames);
+
+                trainingSetForMotif = new LinkedList<>();
+                createDeepCopy(temporaryTrainingSet, trainingSetForMotif);
+                motifInstance.setTriples(replaceConstantInMotifTriples(constant, motifInstance.getTriples(), variableNamesCopy));
+                Set<Triple> bgpTriplePatterns = UtilsJena.convertDomainTriplesToJenaTriples(replaceConstantInTriples(constant, UtilsJena.convertJenaTriplesToDomainTriples(temporaryBgp.getTriplePatterns()), variablesInCbgp, variableNamesCopy));
                 temporaryBgp.setTriplePatterns(bgpTriplePatterns);
-                State state = computeInformation(temporaryBgp, trainingSetForMotif, positiveValues, negativeValues);
-                computeCoverage(state, positiveValues);
+                State state = computeInformation(temporaryBgp, motifInstance, trainingSetForMotif, positiveValues, negativeValues);
                 state.setMotifInstance(motifInstance);
+                computeCoverage(state, positiveValues);
                 states.add(state);
 
                 if ((state.getCoverage() == 1) && (state.getInformation() == 1))
@@ -478,10 +518,10 @@ public class QueryLearner {
             // The best state might not contain a motif. In order to explore further the motif instance
             // we choose the best motif instance we can find, and try to generate a better state using it.
             PriorityQueue<State> backup = new PriorityQueue<>();
-            while (!states.isEmpty()){
+            while (!states.isEmpty()) {
                 State s = states.poll();
                 backup.add(s);
-                if (null != s.getMotifInstance()) {
+                if ((null != s.getMotifInstance()) && (s.getMotifInstance().getId() == motifInstance.getId())) {
                     motifInstance = s.getMotifInstance();
                     break;
                 }
@@ -490,18 +530,58 @@ public class QueryLearner {
         }
     }
 
-    private Set<base.domain.Triple> replaceConstantInTriples(String constant, Set<base.domain.Triple> triples, Set<String> variablesInCandidateTriples) {
-        String sameTypeConstant = findSameTypeConstant(constant, variablesInCandidateTriples);
-
+    private Set<base.domain.Triple> replaceConstantInMotifTriples(String constant, Set<base.domain.Triple> triples, Map<String, Node> variableNamesCopy) {
+        // FIXME: This method is not working as expected.
         Set<base.domain.Triple> newTriplePatterns = new HashSet<>();
-        if (null == sameTypeConstant) {
-            if (!variableNames.containsKey(constant)) {
-                variableNames.put(constant, NodeFactory.createVariable(Constants.EXISTENTIAL_VARIABLE_PATTERN + nsvIndex++));
-            }
-            doReplacement(constant, triples, constant, newTriplePatterns);
+
+        if (variablesInCbgpQueue.isEmpty()) {
+            if (!variableNamesCopy.containsKey(constant))
+                variableNamesCopy.put(constant, NodeFactory.createVariable(Constants.EXISTENTIAL_VARIABLE_PATTERN + nsvIndex++));
+            doReplacement(constant, triples, constant, newTriplePatterns, variableNamesCopy);
         } else {
-            doReplacement(constant, triples, sameTypeConstant, newTriplePatterns);
+            String replacement = variablesInCbgpQueue.poll();
+            for (base.domain.Triple triple : triples) {
+                boolean triplesAlreadyContainsReplacement = !triples.stream()
+                        .filter(t -> t.getSubject().contains(replacement) || t.getObject().contains(replacement))
+                        .collect(Collectors.toList())
+                        .isEmpty();
+
+
+                if (!triplesAlreadyContainsReplacement) {
+                    String tripleSubject = UtilsJena.getCanonicalString(triple.getSubject());
+                    if (tripleSubject.equals(constant)) {
+                        triple.setSubject(replacement);
+                        variableNamesCopy.put(constant, NodeFactoryExtra.parseNode(replacement));
+                    }
+
+                    String tripleObject = UtilsJena.getCanonicalString(triple.getObject());
+                    if (tripleObject.equals(constant)) {
+                        triple.setObject(replacement);
+                        variableNamesCopy.put(constant, NodeFactoryExtra.parseNode(replacement));
+                    }
+
+                    newTriplePatterns.add(triple);
+                } else {
+                    if (!variableNamesCopy.containsKey(constant))
+                        variableNamesCopy.put(constant, NodeFactory.createVariable(Constants.EXISTENTIAL_VARIABLE_PATTERN + nsvIndex++));
+                    doReplacement(constant, triples, constant, newTriplePatterns, variableNamesCopy);
+                }
+            }
         }
+
+
+        return newTriplePatterns;
+    }
+
+    private Set<base.domain.Triple> replaceConstantInTriples(String constant, Set<base.domain.Triple> triples, Set<String> existentialVariablesInCandidateTriples, Map<String, Node> variableNamesCopy) {
+        Set<base.domain.Triple> newTriplePatterns = new HashSet<>();
+
+        if (!variableNamesCopy.containsKey(constant)) {
+            variableNamesCopy.put(constant, NodeFactory.createVariable(Constants.EXISTENTIAL_VARIABLE_PATTERN + nsvIndex++));
+        }
+        doReplacement(constant, triples, constant, newTriplePatterns, variableNamesCopy);
+
+
         return newTriplePatterns;
     }
 
@@ -528,12 +608,13 @@ public class QueryLearner {
                     }
                 }
             }
-        } catch (MalformedURLException e){}
+        } catch (MalformedURLException e) {
+        }
 
         return null;
     }
 
-    private String findElementType(String element){
+    private String findElementType(String element) {
         final String query = "SELECT ?type where { <" + element + "> <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> ?type . }";
         Set<List<String>> results = utilsJena.runQuery(query);
         if (results.iterator().hasNext())
@@ -541,14 +622,16 @@ public class QueryLearner {
         return null;
     }
 
-    private void doReplacement(String constant, Set<base.domain.Triple> triples, String replacement, Set<base.domain.Triple> newTriplePatterns) {
+    private void doReplacement(String constant, Set<base.domain.Triple> triples, String replacement, Set<base.domain.Triple> newTriplePatterns, Map<String, Node> variableNamesCopy) {
         for (base.domain.Triple triple : triples) {
             String tripleSubject = UtilsJena.getCanonicalString(triple.getSubject());
             if (tripleSubject.equals(constant))
-                triple.setSubject(variableNames.get(replacement).toString());
+                triple.setSubject(variableNamesCopy.get(replacement).toString());
+
             String tripleObject = UtilsJena.getCanonicalString(triple.getObject());
             if (tripleObject.equals(constant))
-                triple.setObject(variableNames.get(replacement).toString());
+                triple.setObject(variableNamesCopy.get(replacement).toString());
+
             newTriplePatterns.add(triple);
         }
     }
@@ -611,7 +694,7 @@ public class QueryLearner {
 
                 BasicGraphPattern bgp = new BasicGraphPattern();
                 bgp.setTriplePatterns(Stream.of(triple).collect(Collectors.toCollection(HashSet::new)));
-                State state = computeInformation(bgp, temporaryTrainingSet, positiveValues, negativeValues);
+                State state = computeInformation(bgp, null, temporaryTrainingSet, positiveValues, negativeValues);
 
                 // If the new triple pattern improves the information, then it's the best one.
                 if (state.getInformation() > bestInformation) {
@@ -633,13 +716,19 @@ public class QueryLearner {
         return bestTriplePatterns;
     }
 
-    private State computeInformation(BasicGraphPattern bgp, List<BindingWrapper> temporaryTrainingSet, Map<String, List<String>> positiveValues, Map<String, List<String>> negativeValues) {
+    private State computeInformation(BasicGraphPattern bgp, Motif motifInstance, List<BindingWrapper> temporaryTrainingSet, Map<String, List<String>> positiveValues, Map<String, List<String>> negativeValues) {
+        BasicGraphPattern temporalBgp = new BasicGraphPattern();
+        temporalBgp.getTriplePatterns().addAll(bgp.getTriplePatterns());
+
+        if (null != motifInstance)
+            temporalBgp.getTriplePatterns().addAll(UtilsJena.convertDomainTriplesToJenaTriples(motifInstance.getTriples()));
+
         // Obtaining the bindings of the BGP
-        Map<String, List<String>> bindings = utilsJena.getBindingsValues(bgp, positiveValues);
-        if (!negativeValues.isEmpty()){
-            Map<String, List<String>> negativeBindings = utilsJena.getBindingsValues(bgp, negativeValues);
+        Map<String, List<String>> bindings = utilsJena.getBindingsValues(temporalBgp, positiveValues);
+        if (!negativeValues.isEmpty()) {
+            Map<String, List<String>> negativeBindings = utilsJena.getBindingsValues(temporalBgp, negativeValues);
             for (Map.Entry<String, List<String>> entry : negativeBindings.entrySet()) {
-                if (bindings.containsKey(entry.getKey())){
+                if (bindings.containsKey(entry.getKey())) {
                     List<String> bindingValues = bindings.get(entry.getKey());
                     bindingValues.addAll(entry.getValue());
                     bindings.replace(entry.getKey(), bindingValues);
@@ -667,7 +756,7 @@ public class QueryLearner {
                 List<String> bindingValues = bindings.get(_commonKey);
                 bindingValues = ExampleUtils.removeDoubleQuotes(bindingValues);
                 int i = bindingValues.indexOf(ExampleUtils.cleanString(tuple.getBindings().get(_commonKey)));
-                if (-1 != i){
+                if (-1 != i) {
                     if (checkOtherKeys(_commonKey, commonKeys, bindings, tuple.getBindings())) {
                         // extend tuple j of the training set adding the values coming from row i of the bindingValues
                         extendTuple(temporaryTrainingSet, j, bindings, i, commonKeys, bindingsExtraKeys);
@@ -760,7 +849,7 @@ public class QueryLearner {
 
     // Piece of code to provide a clean instance of the Spring bean
     @Lookup
-    public QueryLearner getLearner(){
+    public QueryLearner getLearner() {
         return null;
     }
 }
