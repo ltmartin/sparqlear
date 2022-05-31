@@ -35,7 +35,7 @@ public class QueryLearnerPersonTest {
 
     @Test
     void peopleWhoKnowsSomeoneWhoKnowsSomeoneThatKnowsPerson1() {
-        String examples = "+Person9 +Person11 +Person14 +Person16 +Person18 -Person4 -Person2 -Person3";
+        String examples = "+Person9 +Person10 +Person11 +Person12 +Person13 +Person14 +Person16 +Person18 -Person4 -Person2 -Person3";
         try {
             Optional<Set<String>> learnedQueries = queryLearner.learn(examples);
             System.out.println("===================================================");
