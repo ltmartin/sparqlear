@@ -16,7 +16,7 @@ import java.util.logging.Logger;
 
 @Service
 public class MotifsService {
-    private final Logger logger = Logger.getLogger(PropertiesService.class.getName());
+    private final Logger logger = Logger.getLogger(MotifsService.class.getName());
     @Resource
     private MotifRepository motifRepository;
 

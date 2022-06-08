@@ -23,7 +23,8 @@ services:
     image: openlink/virtuoso-opensource-7:latest
     restart: always
     volumes:
-      - virtuoso_peopleDataset:/database
+      - virtuoso_people2Dataset:/database
+#      - virtuoso_peopleDataset:/database
 #    - virtuoso_smallimdb:/database
 #    - virtuoso-database:/database
     ports:
@@ -38,7 +39,8 @@ services:
       POSTGRES_PASSWORD: example
       POSTGRES_USER: converter
     volumes:
-      - postgres_peopleDataset:/var/lib/postgresql/data
+      - postgres_people2Dataset:/var/lib/postgresql/data
+#      - postgres_peopleDataset:/var/lib/postgresql/data
 #      - postgres_smallimdb:/var/lib/postgresql/data
 #      - postgres-database:/var/lib/postgresql/data
 volumes:
@@ -50,7 +52,11 @@ volumes:
 #    external: true
 #  virtuoso-database:
 #    external: true
-  postgres_peopleDataset:
+#  postgres_peopleDataset:
+#    external: true
+#  virtuoso_peopleDataset:
+#    external: true
+  postgres_people2Dataset:
     external: true
-  virtuoso_peopleDataset:
+  virtuoso_people2Dataset:
     external: true
