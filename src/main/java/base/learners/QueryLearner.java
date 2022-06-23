@@ -504,6 +504,10 @@ public class QueryLearner {
                     break;
                 }
             }
+
+            // this piece of code keeps the original order of the queue based on the FIFO principle.
+            while (!states.isEmpty()) {backup.add(states.poll());}
+
             states.addAll(backup);
         }
     }
